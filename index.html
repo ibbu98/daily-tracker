@@ -252,7 +252,12 @@
   .edit-icon-inp{text-align:center;font-size:18px;padding:4px!important;}
   .edit-cat-sel{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-soft);font-size:12px;padding:7px 4px;cursor:pointer;}
   .edit-del-btn{background:var(--rose-light);border:1px solid var(--rose);border-radius:8px;color:var(--rose);font-size:14px;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;}
-  .edit-add-btn{width:100%;padding:10px;border-radius:10px;border:1.5px dashed var(--teal);background:transparent;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;margin:8px 0 18px;}
+  .edit-add-btn{width:100%;padding:10px;border-radius:10px;border:1.5px dashed var(--teal);background:transparent;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;margin:8px 0 12px;}
+  .custom-cat-section{margin-bottom:14px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--line);border-radius:10px;}
+  .custom-cat-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;margin-bottom:8px;}
+  .custom-cat-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .custom-cat-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:11.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+  .custom-cat-chip button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;line-height:1;padding:0;display:flex;align-items:center;}
   .edit-actions{display:flex;gap:10px;justify-content:flex-end;}
   .edit-save-btn{padding:10px 24px;border-radius:999px;border:none;background:var(--teal);color:var(--check-mark);font-size:13px;font-weight:700;cursor:pointer;}
   .edit-cancel-btn{padding:10px 24px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:13px;font-weight:600;cursor:pointer;}
@@ -491,6 +496,10 @@
     </div>
     <div id="editRows"></div>
     <button class="edit-add-btn" id="editAddBtn">+ Add activity</button>
+    <div class="custom-cat-section" id="customCatSection" style="display:none">
+      <div class="custom-cat-label">Custom categories</div>
+      <div class="custom-cat-chips" id="customCatChips"></div>
+    </div>
     <div class="edit-actions">
       <button class="edit-reset-btn" id="editResetBtn">↺ Reset to defaults</button>
       <button class="edit-cancel-btn" id="editCancelBtn">Cancel</button>
@@ -506,6 +515,7 @@
 const API_URL      = "https://script.google.com/macros/s/AKfycbyjAOE8Zb6eO7rG974F8wdsnk9Ovy_yTr3RpmCWAPytl5KPkA8gJO2HrU6VScoKG4ZY/exec";
 const START_DATE   = '2026-06-24'; // no tracking before this date
 const IS_TESTER    = false;
+const LS_NS        = IS_TESTER ? 'tst:' : '';
 const USER_A_NAME  = "Ibrahim";
 const USER_B_NAME = "Sameeha";
 
@@ -546,7 +556,7 @@ const ACTIVITIES_SAMEEHA = [
 
 function getActivities(user){
   try{
-    const s = localStorage.getItem(`custom_activities:${user}`);
+    const s = localStorage.getItem(`${LS_NS}custom_activities:${user}`);
     if(s) return JSON.parse(s);
   }catch(e){}
   return user === USER_A_NAME ? ACTIVITIES_IBRAHIM : ACTIVITIES_SAMEEHA;
@@ -583,8 +593,8 @@ function timeToMins(t){
 function sortActivitiesByTime(acts){ return [...acts].sort((a,b) => timeToMins(a.time) - timeToMins(b.time)); }
 
 const BUILTIN_CATS = ['worship','study','friday','other'];
-function getCustomCats(){ try{ return JSON.parse(localStorage.getItem('custom_categories')||'[]'); }catch{ return []; } }
-function saveCustomCat(slug){ const c=getCustomCats(); if(!c.includes(slug)){ c.push(slug); localStorage.setItem('custom_categories',JSON.stringify(c)); } }
+function getCustomCats(){ try{ return JSON.parse(localStorage.getItem(`${LS_NS}custom_categories`)||'[]'); }catch{ return []; } }
+function saveCustomCat(slug){ const c=getCustomCats(); if(!c.includes(slug)){ c.push(slug); localStorage.setItem(`${LS_NS}custom_categories`,JSON.stringify(c)); } }
 function catCSSClass(cat){ return BUILTIN_CATS.includes(cat) ? cat : 'other'; }
 function buildCatOptions(currentCat){
   const all = [...BUILTIN_CATS, ...getCustomCats()];
@@ -734,11 +744,11 @@ async function apiGetPhoto(user, date){
 /* ═══════════════════════════════════════════════
    PHOTO — resize + chunked upload
    ═══════════════════════════════════════════════ */
-function localGetPhotoUrl(user, iso){ try{ return localStorage.getItem(`photo:${user}:${iso}`) || null; }catch(e){ return null; } }
+function localGetPhotoUrl(user, iso){ try{ return localStorage.getItem(`${LS_NS}photo:${user}:${iso}`) || null; }catch(e){ return null; } }
 function localSetPhotoUrl(user, iso, url){
   try{
-    if(url) localStorage.setItem(`photo:${user}:${iso}`, url);
-    else localStorage.removeItem(`photo:${user}:${iso}`);
+    if(url) localStorage.setItem(`${LS_NS}photo:${user}:${iso}`, url);
+    else localStorage.removeItem(`${LS_NS}photo:${user}:${iso}`);
   }catch(e){}
 }
 
@@ -915,19 +925,19 @@ function wireUploadInput(iso){
    LOCAL STORAGE
    ═══════════════════════════════════════════════ */
 function localGet(user, iso){
-  try{ const v = localStorage.getItem(`tracker:${user}:${iso}`); return v ? JSON.parse(v) : []; }
+  try{ const v = localStorage.getItem(`${LS_NS}tracker:${user}:${iso}`); return v ? JSON.parse(v) : []; }
   catch(e){ return []; }
 }
 function localSet(user, iso, arr){
-  try{ localStorage.setItem(`tracker:${user}:${iso}`, JSON.stringify(arr)); }catch(e){}
+  try{ localStorage.setItem(`${LS_NS}tracker:${user}:${iso}`, JSON.stringify(arr)); }catch(e){}
 }
 function localGetNote(user, iso, actId){
-  try{ return localStorage.getItem(`anote:${user}:${iso}:${actId}`) || ''; }catch(e){ return ''; }
+  try{ return localStorage.getItem(`${LS_NS}anote:${user}:${iso}:${actId}`) || ''; }catch(e){ return ''; }
 }
 function localSetNote(user, iso, actId, text){
   try{
-    if(text) localStorage.setItem(`anote:${user}:${iso}:${actId}`, text);
-    else localStorage.removeItem(`anote:${user}:${iso}:${actId}`);
+    if(text) localStorage.setItem(`${LS_NS}anote:${user}:${iso}:${actId}`, text);
+    else localStorage.removeItem(`${LS_NS}anote:${user}:${iso}:${actId}`);
   }catch(e){}
 }
 
@@ -1056,9 +1066,29 @@ function renderSwitcher(){
 /* ═══════════════════════════════════════════════
    EDIT ACTIVITIES MODAL
    ═══════════════════════════════════════════════ */
+function renderCustomCatChips(){
+  const cats = getCustomCats();
+  const section = document.getElementById('customCatSection');
+  const chipsEl = document.getElementById('customCatChips');
+  if(!cats.length){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  chipsEl.innerHTML = cats.map(c =>
+    `<span class="custom-cat-chip">${c.charAt(0).toUpperCase()+c.slice(1).replace(/_/g,' ')}
+       <button data-cat="${c}" title="Delete category">✕</button>
+     </span>`
+  ).join('');
+  chipsEl.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+    const saved = getCustomCats().filter(c => c !== btn.dataset.cat);
+    localStorage.setItem(`${LS_NS}custom_categories`, JSON.stringify(saved));
+    renderCustomCatChips();
+    renderEditRows(getCurrentEditedActivities());
+  }));
+}
+
 function openEditModal(){
   document.getElementById('editModalTitle').textContent = `Edit ${currentUser}'s Activities`;
   renderEditRows(getActivities(currentUser));
+  renderCustomCatChips();
   document.getElementById('editModalOverlay').classList.remove('hidden');
 }
 
@@ -1121,6 +1151,7 @@ function renderEditRows(acts){
         const slug = name.trim().toLowerCase().replace(/\s+/g,'_');
         saveCustomCat(slug);
         this.innerHTML = buildCatOptions(slug);
+        renderCustomCatChips();
       } else {
         this.innerHTML = buildCatOptions(this.dataset.prev || 'worship');
       }
@@ -1172,13 +1203,13 @@ document.getElementById('editAddBtn').addEventListener('click', () => {
 });
 document.getElementById('editSaveBtn').addEventListener('click', () => {
   const sorted = sortActivitiesByTime(getCurrentEditedActivities());
-  localStorage.setItem(`custom_activities:${currentUser}`, JSON.stringify(sorted));
+  localStorage.setItem(`${LS_NS}custom_activities:${currentUser}`, JSON.stringify(sorted));
   document.getElementById('editModalOverlay').classList.add('hidden');
   render();
 });
 document.getElementById('editResetBtn').addEventListener('click', () => {
   if(!confirm('Reset to default activities? Your custom list will be cleared.')) return;
-  localStorage.removeItem(`custom_activities:${currentUser}`);
+  localStorage.removeItem(`${LS_NS}custom_activities:${currentUser}`);
   const defaults = currentUser === USER_A_NAME ? ACTIVITIES_IBRAHIM : ACTIVITIES_SAMEEHA;
   renderEditRows(defaults);
 });
