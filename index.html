@@ -847,8 +847,8 @@ async function apiGetUserConfig(user){
 async function apiSaveUserConfig(user, activities, categories){
   try{
     let url = `${API_URL}?action=saveUserConfig&user=${encodeURIComponent(user)}&token=${sessionToken}`;
-    if(activities) url += `&activities=${encodeURIComponent(JSON.stringify(activities))}`;
-    if(categories) url += `&categories=${encodeURIComponent(JSON.stringify(categories))}`;
+    if(activities != null) url += `&activities=${encodeURIComponent(JSON.stringify(activities))}`;
+    if(categories != null) url += `&categories=${encodeURIComponent(JSON.stringify(categories))}`;
     await fetch(url);
   }catch(e){}
 }
