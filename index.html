@@ -1229,19 +1229,35 @@ function localSetNote(user, iso, actId, text){
   anoteDebounce[_k] = setTimeout(() => apiSaveAnote(user, iso, actId, text), 500);
 }
 async function loadUserConfigFromBackend(user){
-  // Backend is a fallback for first-time/new-device load only — skip the
-  // round trip entirely once local data already exists for this device.
-  const hasActivities = !!localStorage.getItem(`${LS_NS}custom_activities:${user}`);
-  const hasCategories = !!localStorage.getItem(`${LS_NS}custom_categories`);
-  if(hasActivities && hasCategories) return;
+  // Local storage is a fast cache for instant rendering, not the source of
+  // truth — always check the server for the current activity list/categories.
+  // The old version skipped this fetch entirely once ANY local copy existed,
+  // so a device that never happened to be the one an edit was made on stayed
+  // frozen on its first-ever snapshot forever, showing a completely
+  // different activity list (old names, old schedule) than other devices
+  // even though the "current" version had moved on.
+  const localActivitiesRaw = localStorage.getItem(`${LS_NS}custom_activities:${user}`);
+  const localCategoriesRaw = localStorage.getItem(`${LS_NS}custom_categories`);
 
   const cfg = await apiGetUserConfig(user);
-  if(!cfg) return;
-  // Never overwrite existing local data — local edits always take priority.
-  if(cfg.activities && !hasActivities)
-    localStorage.setItem(`${LS_NS}custom_activities:${user}`, JSON.stringify(cfg.activities));
-  if(cfg.categories && !hasCategories)
-    localStorage.setItem(`${LS_NS}custom_categories`, JSON.stringify(cfg.categories));
+  if(!cfg) return false;
+
+  let changed = false;
+  if(cfg.activities){
+    const serialized = JSON.stringify(cfg.activities);
+    if(serialized !== localActivitiesRaw){
+      localStorage.setItem(`${LS_NS}custom_activities:${user}`, serialized);
+      changed = true;
+    }
+  }
+  if(cfg.categories){
+    const serialized = JSON.stringify(cfg.categories);
+    if(serialized !== localCategoriesRaw){
+      localStorage.setItem(`${LS_NS}custom_categories`, serialized);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function clearLocalToggleCache(){
