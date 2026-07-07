@@ -293,8 +293,14 @@
   .photo-day-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:600;}
   .photo-eye-btn{padding:5px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:border-color .15s,color .15s;}
   .photo-eye-btn:hover{border-color:var(--teal);color:var(--teal);}
-  .photo-img-wrap{text-align:center;}
-  .photo-day img{width:100%;max-height:420px;border-radius:12px;object-fit:contain;display:block;margin:0 auto 12px;border:1px solid var(--line);background:#000;}
+  .photo-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:12px;}
+  .photo-thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+  .photo-thumb-remove{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.65);color:#fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .photo-thumb-remove:hover{background:rgba(217,140,140,.9);}
+  .photo-thumb-remove:disabled{opacity:.5;cursor:default;}
+  .photo-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:999;padding:24px;cursor:zoom-out;}
+  .photo-lightbox img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;}
   .photo-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:8px;}
   .photo-upload-btn{
     display:inline-block;padding:10px 24px;border-radius:999px;
@@ -303,14 +309,6 @@
     transition:background .15s;min-height:44px;line-height:1;
   }
   .photo-upload-btn:hover{background:rgba(82,191,152,0.09);}
-  .photo-remove-btn{
-    display:inline-block;padding:10px 20px;border-radius:999px;
-    border:1.5px dashed var(--rose);background:transparent;color:var(--rose);
-    font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
-    transition:background .15s;min-height:44px;line-height:1;
-  }
-  .photo-remove-btn:hover{background:rgba(217,140,140,0.09);}
-  .photo-remove-btn:disabled{opacity:0.5;cursor:default;}
   .photo-empty{color:var(--ink-soft);font-size:13px;margin-bottom:12px;text-align:center;}
   .photo-status{font-size:11px;color:var(--ink-soft);margin-top:8px;font-family:'IBM Plex Mono',monospace;min-height:16px;text-align:center;}
   /* photo breakpoint folded into main mobile block below */
@@ -487,8 +485,8 @@
 
     /* Photo */
     .photo-day{padding:12px;}
-    .photo-day img{max-height:260px;}
-    .photo-upload-btn,.photo-remove-btn{width:100%;text-align:center;box-sizing:border-box;}
+    .photo-gallery{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));}
+    .photo-upload-btn{width:100%;text-align:center;box-sizing:border-box;}
     .photo-actions{flex-direction:column;gap:8px;}
 
     /* Stats */
@@ -615,9 +613,9 @@
 /* ═══════════════════════════════════════════════
    CONFIG
    ═══════════════════════════════════════════════ */
-const API_URL      = "https://script.google.com/macros/s/AKfycbyjAOE8Zb6eO7rG974F8wdsnk9Ovy_yTr3RpmCWAPytl5KPkA8gJO2HrU6VScoKG4ZY/exec";
+const API_URL      = "https://script.google.com/macros/s/AKfycbzswHXj006I7-VIh5Kw0OZobEPtwanygQ0ccMQJdNgRF8VSCgcn9855IZ6TFcAgiddISg/exec";
 const START_DATE   = '2026-06-25'; // no tracking before this date
-const IS_TESTER    = false;
+const IS_TESTER    = true;
 const LS_NS        = IS_TESTER ? 'tst:' : '';
 const USER_A_NAME  = "Ibrahim";
 const USER_B_NAME = "Sameeha";
@@ -754,7 +752,7 @@ function getActScheduleDays(act){
 function getActMonthDay(act){ return act.monthDay || (act.monthDay1Only ? 1 : 1); }
 function actApplies(act, d){
   const di = dayIdx(d);
-  if(act.monthDay)       return d.getDate() === act.monthDay;
+  if(act.monthDay)        return d.getDate() === act.monthDay;
   if(act.monthDay1Only)   return d.getDate() === 1;
   if(act.monthDayFirst)   return d.getDate() <= act.monthDayFirst;
   if(act.monthDayLast){   const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); const n = typeof act.monthDayLast === 'number' ? act.monthDayLast : 1; return d.getDate() >= last - (n - 1); }
@@ -894,6 +892,7 @@ async function apiSaveNote(user, date, note){
     await fetchWithTimeout(url);
   }catch(e){}
 }
+
 async function apiGetUserConfig(user){
   try{
     const url = `${API_URL}?action=getUserConfig&user=${encodeURIComponent(user)}&token=${sessionToken}`;
@@ -918,8 +917,8 @@ async function apiSaveAnote(user, date, actId, text){
   }catch(e){}
 }
 
-async function apiDeletePhoto(user, date){
-  const url = `${API_URL}?action=deletePhoto&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
+async function apiDeletePhoto(user, date, photoId){
+  const url = `${API_URL}?action=deletePhoto&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&token=${sessionToken}`;
   try{
     const res  = await fetchWithTimeout(url, 20000);
     if(!res.ok) return false;
@@ -928,13 +927,13 @@ async function apiDeletePhoto(user, date){
   }catch(e){ return false; }
 }
 
-async function apiGetPhoto(user, date){
-  const url = `${API_URL}?action=getPhoto&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
+async function apiGetPhotos(user, date){
+  const url = `${API_URL}?action=getPhotos&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
   try{
     const res  = await fetchWithTimeout(url);
     if(!res.ok) return null;
     const json = await res.json();
-    return json.ok ? (json.url || null) : null;
+    return json.ok ? (json.photos || []) : null;
   }catch(e){ return null; }
 }
 
@@ -943,17 +942,31 @@ async function apiGetPhoto(user, date){
    ═══════════════════════════════════════════════ */
 function fixDriveUrl(url){
   if(!url) return url;
+  // Convert old uc?export=view URLs to thumbnail format which works in <img> tags
   const m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if(m && url.includes('drive.google.com') && !url.includes('thumbnail'))
     return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w720';
   return url;
 }
-function localGetPhotoUrl(user, iso){ try{ return fixDriveUrl(localStorage.getItem(`${LS_NS}photo:${user}:${iso}`) || null); }catch(e){ return null; } }
-function localSetPhotoUrl(user, iso, url){
+function localGetPhotos(user, iso){
   try{
-    if(url) localStorage.setItem(`${LS_NS}photo:${user}:${iso}`, url);
-    else localStorage.removeItem(`${LS_NS}photo:${user}:${iso}`);
+    const raw = localStorage.getItem(`${LS_NS}photos:${user}:${iso}`);
+    if(raw) return JSON.parse(raw).map(p => ({ id: p.id, url: fixDriveUrl(p.url) }));
+    // migrate the old single-photo key, if present
+    const legacy = localStorage.getItem(`${LS_NS}photo:${user}:${iso}`);
+    if(legacy) return [{ id: 'legacy', url: fixDriveUrl(legacy) }];
+    return [];
+  }catch(e){ return []; }
+}
+function localSetPhotos(user, iso, photos){
+  try{
+    if(photos && photos.length) localStorage.setItem(`${LS_NS}photos:${user}:${iso}`, JSON.stringify(photos));
+    else localStorage.removeItem(`${LS_NS}photos:${user}:${iso}`);
+    localStorage.removeItem(`${LS_NS}photo:${user}:${iso}`);
   }catch(e){}
+}
+function newPhotoId(){
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`).replace(/[^a-zA-Z0-9_-]/g,'');
 }
 
 function resizeImage(file, maxPx = 720){
@@ -980,18 +993,18 @@ function resizeImage(file, maxPx = 720){
   });
 }
 
-async function uploadToDrive(user, date, base64, onProgress){
+async function uploadToDrive(user, date, base64, photoId, onProgress){
   const CHUNK   = 3500;
   const BATCH   = 1;     // sequential — prevents sheet race conditions in GAS
   const chunks  = [];
   for(let i = 0; i < base64.length; i += CHUNK) chunks.push(base64.slice(i, i + CHUNK));
   const total   = chunks.length;
-  const session = `${user.replace(/\W/g,'_')}_${date}_${Date.now()}`;
+  const session = `${user.replace(/\W/g,'_')}_${date}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
   let sent      = 0;
   let finalUrl  = null;
 
   async function sendChunk(idx){
-    const url  = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&chunk=${encodeURIComponent(chunks[idx])}&token=${sessionToken}`;
+    const url  = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&chunk=${encodeURIComponent(chunks[idx])}&token=${sessionToken}`;
     const res  = await fetch(url);
     if(!res.ok) throw new Error(`Server error ${res.status} on chunk ${idx}`);
     const json = await res.json();
@@ -1012,19 +1025,23 @@ async function uploadToDrive(user, date, base64, onProgress){
   return finalUrl;
 }
 
-function buildPhotoContent(photoUrl, iso){
-  const hasPhoto = !!photoUrl;
+function buildPhotoContent(photos, iso){
+  const hasPhotos = photos.length > 0;
+  const gallery = hasPhotos
+    ? `<div class="photo-gallery" id="photoGallery" style="display:${photoVisible?'grid':'none'}">
+        ${photos.map(p => `
+          <div class="photo-thumb" data-id="${escapeHtml(p.id)}">
+            <img src="${p.url}" alt="Photo" loading="lazy" data-full="${p.url}">
+            <button class="photo-thumb-remove" data-id="${escapeHtml(p.id)}" title="Remove">✕</button>
+          </div>`).join('')}
+       </div>`
+    : `<div class="photo-empty" id="photoEmpty">No photos yet for today</div>`;
   return `
-    ${hasPhoto
-      ? `<div class="photo-img-wrap" id="photoImgWrap" style="display:${photoVisible?'block':'none'}">
-           <img src="${photoUrl}" alt="Photo of the day" loading="lazy">
-         </div>`
-      : `<div class="photo-empty" id="photoEmpty">No photo yet for today</div>`}
+    ${gallery}
     <div class="photo-actions">
-      <label class="photo-upload-btn">${hasPhoto ? '🔄 Change photo' : '📷 Add a photo'}
-        <input type="file" accept="image/*" capture="environment" style="display:none" id="photoInput">
+      <label class="photo-upload-btn">📷 Add photo${photos.length ? 's' : ''}
+        <input type="file" accept="image/*" multiple style="display:none" id="photoInput">
       </label>
-      ${hasPhoto ? `<button class="photo-remove-btn" id="photoRemoveBtn">🗑 Remove</button>` : ''}
     </div>
     <div class="photo-status" id="photoStatus"></div>`;
 }
@@ -1034,9 +1051,9 @@ async function renderPhotoDay(){
   if(viewMode !== 'daily'){ host.innerHTML = ''; return; }
   const iso = formatISO(selectedDate);
 
-  let photoUrl = localGetPhotoUrl(currentUser, iso);
+  let photos = localGetPhotos(currentUser, iso);
 
-  const eyeBtn = photoUrl
+  const eyeBtn = photos.length
     ? `<button class="photo-eye-btn" id="photoEyeBtn">${photoVisible ? '👁 Hide' : '👁 Show'}</button>`
     : '';
 
@@ -1045,48 +1062,64 @@ async function renderPhotoDay(){
       <span class="photo-day-label">📸 Photo of the Day</span>
       ${eyeBtn}
     </div>
-    <div id="photoContent">${photoUrl ? buildPhotoContent(photoUrl, iso) : '<div class="photo-status">Loading…</div>'}</div>
+    <div id="photoContent">${buildPhotoContent(photos, iso)}</div>
   </div>`;
 
-  wireEyeBtn();
-  wireUploadInput(iso);
-  wireRemoveBtn(iso);
+  wirePhotoContent(iso);
 
-  // Fetch from server in background
+  // Fetch from server in background — trust it as the source of truth once it answers
   if(configured()){
-    const serverUrl = fixDriveUrl(await apiGetPhoto(currentUser, iso));
-    if(serverUrl && serverUrl !== photoUrl){
-      photoUrl = serverUrl;
-      localSetPhotoUrl(currentUser, iso, serverUrl);
+    const serverPhotos = await apiGetPhotos(currentUser, iso);
+    if(serverPhotos && JSON.stringify(serverPhotos) !== JSON.stringify(photos)){
+      photos = serverPhotos.map(p => ({ id: p.id, url: fixDriveUrl(p.url) }));
+      localSetPhotos(currentUser, iso, photos);
       const content = document.getElementById('photoContent');
-      if(content){ content.innerHTML = buildPhotoContent(serverUrl, iso); wireUploadInput(iso); wireRemoveBtn(iso); }
+      if(content) content.innerHTML = buildPhotoContent(photos, iso);
       const header = document.querySelector('.photo-day-header');
-      if(header && !header.querySelector('.photo-eye-btn')){
-        header.insertAdjacentHTML('beforeend', `<button class="photo-eye-btn" id="photoEyeBtn">${photoVisible?'👁 Hide':'👁 Show'}</button>`);
-        wireEyeBtn();
+      if(header){
+        const existingEye = header.querySelector('.photo-eye-btn');
+        if(photos.length && !existingEye){
+          header.insertAdjacentHTML('beforeend', `<button class="photo-eye-btn" id="photoEyeBtn">${photoVisible?'👁 Hide':'👁 Show'}</button>`);
+        } else if(!photos.length && existingEye){
+          existingEye.remove();
+        }
       }
-    } else if(!photoUrl){
-      const content = document.getElementById('photoContent');
-      if(content){ content.innerHTML = buildPhotoContent(null, iso); wireUploadInput(iso); wireRemoveBtn(iso); }
+      wirePhotoContent(iso);
     }
-  } else if(!photoUrl){
-    const content = document.getElementById('photoContent');
-    if(content){ content.innerHTML = buildPhotoContent(null, iso); wireUploadInput(iso); wireRemoveBtn(iso); }
   }
 }
 
-function wireRemoveBtn(iso){
-  const btn = document.getElementById('photoRemoveBtn');
-  if(!btn) return;
-  btn.addEventListener('click', async () => {
-    if(!confirm('Remove today\'s photo?')) return;
-    btn.disabled = true;
-    btn.textContent = 'Removing…';
-    if(configured()) await apiDeletePhoto(currentUser, iso);
-    localSetPhotoUrl(currentUser, iso, null);
-    photoVisible = true;
-    renderPhotoDay();
-  });
+function wirePhotoContent(iso){
+  wireEyeBtn();
+  wireUploadInput(iso);
+  wireGalleryEvents(iso);
+}
+
+function wireGalleryEvents(iso){
+  const gallery = document.getElementById('photoGallery');
+  if(!gallery) return;
+  gallery.querySelectorAll('img[data-full]').forEach(img =>
+    img.addEventListener('click', () => openLightbox(img.dataset.full))
+  );
+  gallery.querySelectorAll('.photo-thumb-remove').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      if(!confirm('Remove this photo?')) return;
+      btn.disabled = true;
+      const photoId = btn.dataset.id;
+      if(configured()) await apiDeletePhoto(currentUser, iso, photoId);
+      const remaining = localGetPhotos(currentUser, iso).filter(p => p.id !== photoId);
+      localSetPhotos(currentUser, iso, remaining);
+      renderPhotoDay();
+    })
+  );
+}
+
+function openLightbox(url){
+  const box = document.createElement('div');
+  box.className = 'photo-lightbox';
+  box.innerHTML = `<img src="${url}" alt="Photo">`;
+  box.addEventListener('click', () => box.remove());
+  document.body.appendChild(box);
 }
 
 function wireEyeBtn(){
@@ -1095,8 +1128,8 @@ function wireEyeBtn(){
   btn.addEventListener('click', () => {
     photoVisible = !photoVisible;
     btn.textContent = photoVisible ? '👁 Hide' : '👁 Show';
-    const wrap = document.getElementById('photoImgWrap');
-    if(wrap) wrap.style.display = photoVisible ? 'block' : 'none';
+    const gallery = document.getElementById('photoGallery');
+    if(gallery) gallery.style.display = photoVisible ? 'grid' : 'none';
   });
 }
 
@@ -1104,24 +1137,36 @@ function wireUploadInput(iso){
   const input = document.getElementById('photoInput');
   if(!input) return;
   input.addEventListener('change', async ev => {
-    const file = ev.target.files[0];
-    if(!file) return;
+    const files = Array.from(ev.target.files || []);
+    if(!files.length) return;
     const status = document.getElementById('photoStatus');
     const label  = input.closest('label');
     if(label) label.style.pointerEvents = 'none';
-    status.textContent = 'Resizing image…';
-    try{
-      const base64 = await resizeImage(file);
-      const imgUrl = await uploadToDrive(currentUser, iso, base64, (done, total) => {
-        status.textContent = `Uploading… ${done}/${total} chunks`;
-      });
-      localSetPhotoUrl(currentUser, iso, imgUrl);
-      status.textContent = '✓ Saved to Google Drive';
-      setTimeout(() => { photoVisible = true; renderPhotoDay(); }, 800);
-    }catch(err){
-      status.textContent = '⚠ ' + err.message;
-      if(label) label.style.pointerEvents = '';
+    photoVisible = true;
+
+    for(let i = 0; i < files.length; i++){
+      status.textContent = files.length > 1
+        ? `Resizing image ${i+1}/${files.length}…`
+        : 'Resizing image…';
+      try{
+        const base64  = await resizeImage(files[i]);
+        const photoId = newPhotoId();
+        const imgUrl  = await uploadToDrive(currentUser, iso, base64, photoId, (done, total) => {
+          status.textContent = files.length > 1
+            ? `Uploading ${i+1}/${files.length}… ${done}/${total} chunks`
+            : `Uploading… ${done}/${total} chunks`;
+        });
+        const current = localGetPhotos(currentUser, iso);
+        current.push({ id: photoId, url: imgUrl });
+        localSetPhotos(currentUser, iso, current);
+      }catch(err){
+        status.textContent = '⚠ ' + err.message;
+        if(label) label.style.pointerEvents = '';
+        return;
+      }
     }
+    status.textContent = '✓ Saved to Google Drive';
+    setTimeout(() => renderPhotoDay(), 800);
   });
 }
 
@@ -1170,7 +1215,7 @@ function clearLocalToggleCache(){
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
     if(!k) continue;
-    if(k.startsWith(`${LS_NS}tracker:`) || k.startsWith(`${LS_NS}photo:`)) toDelete.push(k);
+    if(k.startsWith(`${LS_NS}tracker:`) || k.startsWith(`${LS_NS}photo:`) || k.startsWith(`${LS_NS}photos:`)) toDelete.push(k);
   }
   toDelete.forEach(k => localStorage.removeItem(k));
 }
@@ -1507,6 +1552,7 @@ document.getElementById('editSaveBtn').addEventListener('click', () => {
     const defs = currentUser === USER_A_NAME ? ACTIVITIES_IBRAHIM : ACTIVITIES_SAMEEHA;
     const prevDeleted = JSON.parse(localStorage.getItem(`${LS_NS}deleted_acts:${currentUser}`) || '[]');
     const nowDeleted  = defs.filter(d => !savedIds.has(d.id)).map(d => d.id);
+    // Also un-delete any that were re-added (custom activity with same id restored).
     const merged = [...new Set([...prevDeleted, ...nowDeleted])].filter(id => !savedIds.has(id));
     localStorage.setItem(`${LS_NS}deleted_acts:${currentUser}`, JSON.stringify(merged));
     localStorage.setItem(`${LS_NS}custom_activities:${currentUser}`, JSON.stringify(sorted));
@@ -1594,6 +1640,7 @@ async function loadWeek(){
 
   document.getElementById('errorHost').innerHTML = '';
 
+  // ── Step 1: Render instantly from localStorage ───────────────────────────
   weekDataA = {}; weekDataB = {};
   dates.forEach(d => {
     const iso = formatISO(d);
@@ -1607,6 +1654,7 @@ async function loadWeek(){
     render(); return;
   }
 
+  // ── Step 2: If cache hit, render immediately — no loading spinner ─────────
   const hit = apiCache[cacheKey];
   if(hit){
     applyWeekData(dates, hit.data);
@@ -1614,11 +1662,13 @@ async function loadWeek(){
     setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`);
     render();
     if(Date.now() - hit.time < 60000){ prefetchAdjacent(); return; }
+    // Cache stale: refresh silently in background (no spinner)
   } else {
     document.getElementById('tableHost').innerHTML = '<div class="loading">Loading…</div>';
     document.getElementById('tableHost').className = 'loading';
   }
 
+  // ── Step 3: Fetch from API (first load or silent refresh) ─────────────────
   try{
     const data = await apiGetWeekBoth(start, end);
     apiCache[cacheKey] = { data, time: Date.now() };
@@ -1633,6 +1683,7 @@ async function loadWeek(){
       setSyncBadge('err', 'Could not reach sheet — showing local data');
       render();
     }
+    // If we had a cache hit, keep showing it — don't re-render with error
   }
 }
 
@@ -1988,11 +2039,13 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
     await apiSaveNote(currentUser, currentIso, html);
   }
 
+  // Called by render() on every date change
   window.updateStickyDate = async function(iso){
     if(iso === currentIso) return;
     flushSave(); // fire-and-forget — don't block navigation
     currentIso = iso;
     if(dateLbl) dateLbl.textContent = iso;
+    // Show from localStorage first, then fetch backend
     try{ setContent(localStorage.getItem(localKey(iso)) || ''); }catch(e){}
     if(typeof currentUser !== 'undefined' && currentUser){
       const note = await apiGetNote(currentUser, iso);
@@ -2003,6 +2056,7 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
     }
   };
 
+  // Called by selectUser after login
   window.loadStickyFromBackend = async function(user, iso){
     currentIso = iso;
     if(dateLbl) dateLbl.textContent = iso;
@@ -2014,6 +2068,7 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
     }
   };
 
+  // Toolbar: bold / italic / underline / strikethrough
   document.querySelectorAll('.sn-btn[data-cmd]').forEach(btn => {
     btn.addEventListener('mousedown', e => {
       e.preventDefault();
@@ -2058,10 +2113,10 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
       resizeElR.classList.add('dragging');
       const onMoveR = mv => {
         // drag left = right edge pulls left (shrink right); drag right = right edge pushes right (expand right)
-        const delta    = startX - mv.clientX;
+        const delta   = startX - mv.clientX;
         const newRight = Math.max(0, startR + delta);
-        const actual   = newRight - startR;
-        const newW     = Math.max(200, startW - actual);
+        const actual  = newRight - startR;
+        const newW    = Math.max(200, startW - actual);
         snEl.style.right = newRight + 'px';
         snEl.style.width = newW + 'px';
       };
