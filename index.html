@@ -1005,16 +1005,26 @@ async function uploadToDrive(user, date, base64, photoId, onProgress){
 
   async function sendChunk(idx){
     // Chunk payload goes in the POST body, not the URL — long GET query strings
-    // get silently truncated/mangled by some mobile carrier proxies, which corrupts
-    // the base64 data without any visible network error (surfaces later as a
-    // "Could not decode string" error from the server's base64 decode).
-    const url  = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&token=${sessionToken}`;
-    const res  = await fetch(url, { method: 'POST', body: new URLSearchParams({ chunk: chunks[idx] }) });
-    if(!res.ok) throw new Error(`Server error ${res.status} on chunk ${idx}`);
-    const json = await res.json();
-    if(!json.ok) throw new Error(json.error || `Chunk ${idx} failed`);
-    sent++; onProgress(sent, total);
-    if(json.done) finalUrl = json.url;
+    // get silently truncated/mangled by some mobile carrier proxies. Even with
+    // POST, a flaky mobile connection can still truncate a chunk in transit
+    // while the request still reports success — the server rejects any
+    // undersized non-final chunk, so retry a few times before giving up.
+    const url = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&token=${sessionToken}`;
+    let lastErr;
+    for(let attempt = 1; attempt <= 3; attempt++){
+      try{
+        const res  = await fetch(url, { method: 'POST', body: new URLSearchParams({ chunk: chunks[idx] }) });
+        if(!res.ok) throw new Error(`Server error ${res.status} on chunk ${idx}`);
+        const json = await res.json();
+        if(!json.ok) throw new Error(json.error || `Chunk ${idx} failed`);
+        sent++; onProgress(sent, total);
+        if(json.done) finalUrl = json.url;
+        return;
+      }catch(err){
+        lastErr = err;
+      }
+    }
+    throw lastErr;
   }
 
   // All chunks except last — parallel batches
