@@ -1005,15 +1005,19 @@ async function uploadToDrive(user, date, base64, photoId, onProgress){
 
   async function sendChunk(idx){
     // Chunk payload goes in the POST body, not the URL — long GET query strings
-    // get silently truncated/mangled by some mobile carrier proxies. Even with
-    // POST, a flaky mobile connection can still truncate a chunk in transit
-    // while the request still reports success — the server rejects any
-    // undersized non-final chunk, so retry a few times before giving up.
+    // get silently truncated/mangled by some mobile carrier proxies. FormData
+    // (multipart) is used instead of URLSearchParams: on one real device the
+    // exact same middle chunk came back truncated to 7 chars on every retry,
+    // which URLSearchParams-as-fetch-body is a known WebKit trouble spot for —
+    // a deterministic encoding bug, not transient network flakiness. FormData
+    // uses a completely different wire encoding, so retries actually help here.
     const url = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&token=${sessionToken}`;
     let lastErr;
     for(let attempt = 1; attempt <= 3; attempt++){
       try{
-        const res  = await fetch(url, { method: 'POST', body: new URLSearchParams({ chunk: chunks[idx] }) });
+        const body = new FormData();
+        body.append('chunk', chunks[idx]);
+        const res  = await fetch(url, { method: 'POST', body });
         if(!res.ok) throw new Error(`Server error ${res.status} on chunk ${idx}`);
         const json = await res.json();
         if(!json.ok) throw new Error(json.error || `Chunk ${idx} failed`);
