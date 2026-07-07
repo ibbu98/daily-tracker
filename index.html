@@ -1004,8 +1004,12 @@ async function uploadToDrive(user, date, base64, photoId, onProgress){
   let finalUrl  = null;
 
   async function sendChunk(idx){
-    const url  = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&chunk=${encodeURIComponent(chunks[idx])}&token=${sessionToken}`;
-    const res  = await fetch(url);
+    // Chunk payload goes in the POST body, not the URL — long GET query strings
+    // get silently truncated/mangled by some mobile carrier proxies, which corrupts
+    // the base64 data without any visible network error (surfaces later as a
+    // "Could not decode string" error from the server's base64 decode).
+    const url  = `${API_URL}?action=uploadChunk&session=${encodeURIComponent(session)}&index=${idx}&total=${total}&user=${encodeURIComponent(user)}&date=${date}&photoId=${encodeURIComponent(photoId)}&token=${sessionToken}`;
+    const res  = await fetch(url, { method: 'POST', body: new URLSearchParams({ chunk: chunks[idx] }) });
     if(!res.ok) throw new Error(`Server error ${res.status} on chunk ${idx}`);
     const json = await res.json();
     if(!json.ok) throw new Error(json.error || `Chunk ${idx} failed`);
