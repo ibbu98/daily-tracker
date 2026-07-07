@@ -815,6 +815,7 @@ let photoVisible = true;
 let _noteSaveTimer = null;
 const apiCache   = {};
 const pendingSaves = new Set(); // "who:iso" — blocks applyWeekData from overwriting in-flight saves
+const pendingDiffs = {}; // "who:iso" -> { activityId: checked } accumulated since the last successful save
 
 /* ═══════════════════════════════════════════════
    API LAYER
@@ -866,13 +867,23 @@ async function apiGetWeekBoth(start, end){
   return json;
 }
 
-async function apiSaveDay(user, date, activities){
-  const url  = `${API_URL}?action=saveDay&user=${encodeURIComponent(user)}&date=${date}&activities=${encodeURIComponent(JSON.stringify(activities))}&token=${sessionToken}`;
+async function apiSaveDay(user, date, diffs){
+  const url  = `${API_URL}?action=saveDay&user=${encodeURIComponent(user)}&date=${date}&diffs=${encodeURIComponent(JSON.stringify(diffs))}&token=${sessionToken}`;
   const res  = await fetchWithTimeout(url);
   if(!res.ok) throw new Error('Network error ' + res.status);
   const json = await res.json();
   if(!json.ok && json.error === 'Unauthorized'){ handleUnauthorized(); throw new Error('Session expired'); }
   if(!json.ok) throw new Error(json.error || 'Save failed');
+  return json;
+}
+
+async function apiResetDay(user, date){
+  const url  = `${API_URL}?action=resetDay&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
+  const res  = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok && json.error === 'Unauthorized'){ handleUnauthorized(); throw new Error('Session expired'); }
+  if(!json.ok) throw new Error(json.error || 'Reset failed');
   return json;
 }
 
@@ -1747,26 +1758,39 @@ async function toggleActivity(iso, activityId, dIdx, who){
     const saveKey  = `${who}:${iso}`;
     clearTimeout(saveDebounce[debKey]);
     pendingSaves.add(saveKey);
+    // Accumulate this toggle into whatever diffs are still waiting to be sent
+    // for this day, so several quick toggles coalesce into one request —
+    // but the request always describes *changes*, never a full snapshot, so
+    // it can't clobber a change another device just saved.
+    if(!pendingDiffs[debKey]) pendingDiffs[debKey] = {};
+    pendingDiffs[debKey][activityId] = !wasChecked;
+
     saveDebounce[debKey] = setTimeout(async () => {
-      const snapshot = [...(who === USER_A_NAME ? weekDataA[iso] : weekDataB[iso])];
+      const diffs = pendingDiffs[debKey];
+      delete pendingDiffs[debKey];
       setSyncBadge('local', 'Saving…');
       try{
-        await apiSaveDay(who, iso, snapshot);
+        const result = await apiSaveDay(who, iso, diffs);
         pendingSaves.delete(saveKey);
-        // Update cache
-        const dates    = getWeekDates();
-        const cacheKey = `${formatISO(dates[0])}:${formatISO(dates[6])}`;
-        if(apiCache[cacheKey]){
-          const cached = apiCache[cacheKey].data;
-          if(!cached.data) cached.data = {};
-          if(!cached.data[who]) cached.data[who] = {};
-          cached.data[who][iso] = snapshot;
-          apiCache[cacheKey].time = Date.now();
+        // Trust the server's merged result as the source of truth for the cache —
+        // it reflects any concurrent changes from other devices too, not just ours.
+        if(result.activities){
+          const dates    = getWeekDates();
+          const cacheKey = `${formatISO(dates[0])}:${formatISO(dates[6])}`;
+          if(apiCache[cacheKey]){
+            const cached = apiCache[cacheKey].data;
+            if(!cached.data) cached.data = {};
+            if(!cached.data[who]) cached.data[who] = {};
+            cached.data[who][iso] = result.activities;
+            apiCache[cacheKey].time = Date.now();
+          }
         }
         setSyncBadge('cloud', `Saved ✓ — ${USER_A_NAME} &amp; ${USER_B_NAME}`);
         setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
       }catch(err){
         pendingSaves.delete(saveKey);
+        // Put the diffs back so the next change (or a future retry) still includes them
+        pendingDiffs[debKey] = { ...diffs, ...(pendingDiffs[debKey] || {}) };
         setSyncBadge('err', 'Save failed — will retry on next change');
       }
     }, 300);
@@ -1969,7 +1993,7 @@ function renderUndoBtn(){
     const set = who === USER_A_NAME ? weekDataA[iso] : weekDataB[iso];
     if(wasChecked) set.add(activityId); else set.delete(activityId);
     localSet(who, iso, [...set]);
-    if(usingCloud) apiSaveDay(who, iso, [...set]).catch(() => {});
+    if(usingCloud) apiSaveDay(who, iso, { [activityId]: wasChecked }).catch(() => {});
     lastAction = null;
     renderLight();
     renderUndoBtn();
@@ -1986,7 +2010,13 @@ function renderResetBtn(){
     set.clear();
     localSet(currentUser, iso, []);
     Object.keys(apiCache).forEach(k => delete apiCache[k]);
-    if(usingCloud) apiSaveDay(currentUser, iso, []).catch(() => {});
+    // Drop any queued-but-unsent toggles for this day — they'd otherwise fire
+    // right after the reset and silently re-add whatever they described.
+    const debKey = `${currentUser}:${iso}`;
+    clearTimeout(saveDebounce[debKey]);
+    delete pendingDiffs[debKey];
+    pendingSaves.delete(debKey);
+    if(usingCloud) apiResetDay(currentUser, iso).catch(() => {});
     renderLight();
     renderResetBtn();
   });
