@@ -1200,13 +1200,18 @@ function localSetNote(user, iso, actId, text){
   anoteDebounce[_k] = setTimeout(() => apiSaveAnote(user, iso, actId, text), 500);
 }
 async function loadUserConfigFromBackend(user){
+  // Backend is a fallback for first-time/new-device load only — skip the
+  // round trip entirely once local data already exists for this device.
+  const hasActivities = !!localStorage.getItem(`${LS_NS}custom_activities:${user}`);
+  const hasCategories = !!localStorage.getItem(`${LS_NS}custom_categories`);
+  if(hasActivities && hasCategories) return;
+
   const cfg = await apiGetUserConfig(user);
   if(!cfg) return;
-  // Backend is a fallback for first-time/new-device load only.
   // Never overwrite existing local data — local edits always take priority.
-  if(cfg.activities && !localStorage.getItem(`${LS_NS}custom_activities:${user}`))
+  if(cfg.activities && !hasActivities)
     localStorage.setItem(`${LS_NS}custom_activities:${user}`, JSON.stringify(cfg.activities));
-  if(cfg.categories && !localStorage.getItem(`${LS_NS}custom_categories`))
+  if(cfg.categories && !hasCategories)
     localStorage.setItem(`${LS_NS}custom_categories`, JSON.stringify(cfg.categories));
 }
 
@@ -1316,7 +1321,9 @@ async function selectUser(name){
   document.getElementById('app').classList.add('visible');
   document.getElementById('stickyNote').style.display = 'flex';
   renderSwitcher();
-  await loadUserConfigFromBackend(name);
+  // Run in parallel — loadWeek() doesn't depend on the user-config fallback,
+  // so there's no reason to serialize two slow Apps Script round trips.
+  loadUserConfigFromBackend(name).then(() => render());
   loadWeek();
   loadStickyFromBackend(name, formatISO(selectedDate));
 }
