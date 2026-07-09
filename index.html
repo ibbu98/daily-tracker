@@ -261,6 +261,10 @@
   .edit-actions{display:flex;gap:10px;justify-content:flex-end;}
   .edit-save-btn{padding:10px 24px;border-radius:999px;border:none;background:var(--teal);color:var(--check-mark);font-size:13px;font-weight:700;cursor:pointer;}
   .edit-cancel-btn{padding:10px 24px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:13px;font-weight:600;cursor:pointer;}
+  .scope-choice-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-align:left;transition:border-color .15s,background .15s;width:100%;font-family:'Inter',sans-serif;}
+  .scope-choice-btn:hover{border-color:var(--teal);background:rgba(82,191,152,0.06);}
+  .scope-choice-btn strong{font-size:14px;}
+  .scope-choice-btn span{font-size:12px;color:var(--ink-soft);}
   .edit-open-btn{font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
   .edit-open-btn:hover{border-color:var(--teal);color:var(--teal);}
   .edit-reset-btn{padding:10px 16px;border-radius:999px;border:1px solid var(--rose);background:transparent;color:var(--rose);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace;margin-right:auto;}
@@ -609,6 +613,26 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="scopeModalOverlay">
+  <div class="edit-modal" style="max-width:420px;">
+    <h3>Apply these changes to…</h3>
+    <p style="color:var(--ink-soft);font-size:13px;margin:8px 0 20px;line-height:1.5;">You renamed, rescheduled, or removed an activity. Choose how far back this should apply.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="scope-choice-btn" id="scopeFutureBtn">
+        <strong>From today onward</strong>
+        <span>Past days keep showing things exactly as they were</span>
+      </button>
+      <button class="scope-choice-btn" id="scopeAllBtn">
+        <strong>Entire history</strong>
+        <span>Also changes how past days are shown and calculated</span>
+      </button>
+    </div>
+    <div class="edit-actions" style="margin-top:16px;">
+      <button class="edit-cancel-btn" id="scopeCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════════
    CONFIG
@@ -695,22 +719,9 @@ function getActivities(user){
   return user === USER_A_NAME ? ACTIVITIES_IBRAHIM : ACTIVITIES_SAMEEHA;
 }
 
-/* ═══════════════════════════════════════════════
-   LABEL HISTORY — add entries here if you rename an activity
-   Example: "ibrahim_electronics": [{ until:"2026-06-20", label:"Old Name" }]
-   ═══════════════════════════════════════════════ */
-const LABEL_HISTORY = {};
-
-function getLabel(actId, dateISO, fallback){
-  const history = LABEL_HISTORY[actId];
-  if(history){
-    const sorted = [...history].sort((a,b) => b.until.localeCompare(a.until));
-    for(const e of sorted){ if(dateISO <= e.until) return e.label; }
-  }
-  // Always prefer the saved/custom label (fallback) over hardcoded defaults.
-  // The hardcoded lookup was causing user label-edits to be silently ignored.
-  return fallback || actId;
-}
+// Per-activity historical versioning now lives on the activity object itself
+// (act.history, populated by the "entire history vs. from today only" prompt
+// in the edit modal) and is resolved via resolveActivityForDate() — see below.
 
 /* ═══════════════════════════════════════════════
    CONSTANTS
@@ -750,14 +761,30 @@ function getActScheduleDays(act){
   return [0,1,2,3,4,5,6];
 }
 function getActMonthDay(act){ return act.monthDay || (act.monthDay1Only ? 1 : 1); }
+// Merges in whichever historical snapshot of `act` was in effect on
+// dateISO — lets edits made via "from today onward" leave past days
+// showing the activity exactly as it was before the edit.
+function resolveActivityForDate(act, dateISO){
+  if(act.history && act.history.length){
+    for(const h of act.history){
+      if(dateISO <= h.until) return { ...act, ...h };
+    }
+  }
+  return act;
+}
+
 function actApplies(act, d){
+  const iso = formatISO(d);
+  if(act.effectiveFrom && iso < act.effectiveFrom) return false;
+  if(act.discontinuedFrom && iso >= act.discontinuedFrom) return false;
+  const a  = resolveActivityForDate(act, iso);
   const di = dayIdx(d);
-  if(act.monthDay)        return d.getDate() === act.monthDay;
-  if(act.monthDay1Only)   return d.getDate() === 1;
-  if(act.monthDayFirst)   return d.getDate() <= act.monthDayFirst;
-  if(act.monthDayLast){   const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); const n = typeof act.monthDayLast === 'number' ? act.monthDayLast : 1; return d.getDate() >= last - (n - 1); }
-  if(act.scheduleDays && act.scheduleDays.length < 7) return act.scheduleDays.includes(di);
-  if(act.fridayOnly)     return di === 4;
+  if(a.monthDay)        return d.getDate() === a.monthDay;
+  if(a.monthDay1Only)   return d.getDate() === 1;
+  if(a.monthDayFirst)   return d.getDate() <= a.monthDayFirst;
+  if(a.monthDayLast){   const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); const n = typeof a.monthDayLast === 'number' ? a.monthDayLast : 1; return d.getDate() >= last - (n - 1); }
+  if(a.scheduleDays && a.scheduleDays.length < 7) return a.scheduleDays.includes(di);
+  if(a.fridayOnly)     return di === 4;
   return true;
 }
 
@@ -1442,9 +1469,24 @@ const EMOJIS = [
 
 function openEditModal(){
   document.getElementById('editModalTitle').textContent = `Edit ${currentUser}'s Activities`;
-  renderEditRows(getActivities(currentUser));
+  // Activities already discontinued (removed "from today onward" in an
+  // earlier session) stay in storage for historical display but shouldn't
+  // clutter the edit list — there's nothing left to edit on them.
+  renderEditRows(getActivities(currentUser).filter(a => !a.discontinuedFrom));
   renderCustomCatChips();
   document.getElementById('editModalOverlay').classList.remove('hidden');
+}
+
+// Resolves to 'future', 'all', or null (cancelled).
+function askEditScope(){
+  return new Promise(resolve => {
+    const overlay = document.getElementById('scopeModalOverlay');
+    overlay.classList.remove('hidden');
+    const cleanup = val => { overlay.classList.add('hidden'); resolve(val); };
+    document.getElementById('scopeFutureBtn').onclick = () => cleanup('future');
+    document.getElementById('scopeAllBtn').onclick    = () => cleanup('all');
+    document.getElementById('scopeCancelBtn').onclick = () => cleanup(null);
+  });
 }
 
 function renderEditRows(acts){
@@ -1596,10 +1638,56 @@ document.getElementById('editAddBtn').addEventListener('click', () => {
   a.push({ id:`${currentUser.toLowerCase()}_custom_${Date.now()}`, icon:'⭐', label:'New Activity', time:'', cat:'worship' });
   renderEditRows(a);
 });
-document.getElementById('editSaveBtn').addEventListener('click', () => {
+const EDIT_TRACKED_FIELDS = ['label','time','cat','icon','scheduleDays','monthDay','monthDayFirst','monthDayLast','fridayOnly','monthDay1Only'];
+
+document.getElementById('editSaveBtn').addEventListener('click', async () => {
   try{
-    const sorted = sortActivitiesByTime(getCurrentEditedActivities());
-    // Track which hardcoded activities were removed so auto-append skips them.
+    const allBefore    = getActivities(currentUser);
+    const activeBefore = allBefore.filter(a => !a.discontinuedFrom);
+    const carryForward = allBefore.filter(a => a.discontinuedFrom); // untouched this session
+    const beforeById   = Object.fromEntries(activeBefore.map(a => [a.id, a]));
+
+    let sorted = sortActivitiesByTime(getCurrentEditedActivities());
+    const sortedIds = new Set(sorted.map(a => a.id));
+
+    const changedIds = new Set();
+    sorted.forEach(a => {
+      const old = beforeById[a.id];
+      if(!old) return; // brand new — handled separately below
+      if(EDIT_TRACKED_FIELDS.some(f => JSON.stringify(a[f]) !== JSON.stringify(old[f]))) changedIds.add(a.id);
+    });
+    const deletedIds = activeBefore.filter(a => !sortedIds.has(a.id)).map(a => a.id);
+    const addedIds   = sorted.filter(a => !beforeById[a.id]).map(a => a.id);
+
+    let scope = 'all';
+    if(changedIds.size || deletedIds.length){
+      scope = await askEditScope();
+      if(scope === null) return; // cancelled — leave the edit modal open as-is
+    }
+
+    if(scope === 'future'){
+      const yesterday = formatISO(new Date(Date.now() - 86400000));
+      // A "from today" delete keeps the row (so past days still show it)
+      // but stops it applying going forward.
+      deletedIds.forEach(id => sorted.push({ ...beforeById[id], discontinuedFrom: todayISO }));
+      // A "from today" edit snapshots the old field values into history
+      // before the new values take effect.
+      sorted = sorted.map(a => {
+        if(!changedIds.has(a.id)) return a;
+        const old = beforeById[a.id];
+        const snapshot = {};
+        EDIT_TRACKED_FIELDS.forEach(f => { if(old[f] !== undefined) snapshot[f] = old[f]; });
+        return { ...a, history: [...(old.history || []), { until: yesterday, ...snapshot }] };
+      });
+    }
+    // New activities have no past to apply to — they simply start today.
+    sorted = sorted.map(a => addedIds.includes(a.id) ? { ...a, effectiveFrom: todayISO } : a);
+
+    sorted = sortActivitiesByTime([...sorted, ...carryForward]);
+
+    // Track which hardcoded activities were removed so auto-append skips them
+    // (only relevant for a true "entire history" delete — a "from today"
+    // delete keeps its row above, so it's already accounted for).
     const savedIds = new Set(sorted.map(a => a.id));
     const defs = currentUser === USER_A_NAME ? ACTIVITIES_IBRAHIM : ACTIVITIES_SAMEEHA;
     const prevDeleted = JSON.parse(localStorage.getItem(`${LS_NS}deleted_acts:${currentUser}`) || '[]');
@@ -1850,7 +1938,11 @@ function render(){
   getActivities(currentUser).forEach(act => {
     if(viewMode === 'daily' && !actApplies(act, dates[0])) return;
     if(viewMode === 'weekly' && getActScheduleType(act) !== 'daily') return;
-    const label = getLabel(act.id, labelDate, act.label);
+    // Show the row as it looked on the displayed date, not necessarily as it
+    // looks today — an edit saved "from today onward" leaves past days
+    // showing the old name/time/icon.
+    const rowAct = resolveActivityForDate(act, labelDate);
+    const label  = rowAct.label;
     tbody += `<tr class="${act.section?'section-start':''}" data-act="${act.id}">`;
 
     let actCell = '';
@@ -1858,12 +1950,12 @@ function render(){
       const iso  = formatISO(dates[0]);
       const note = localGetNote(currentUser, iso, act.id);
       const noteTA = `<textarea class="act-note" data-iso="${iso}" data-actid="${act.id}" placeholder="📝 Add a note…">${escapeHtml(note)}</textarea>`;
-      actCell = `<td class="activity"><div class="act-row"><div class="act-icon ${catCSSClass(act.cat)}">${act.icon}</div><div class="act-text"><div class="act-label">${label}</div><div class="act-daily-row"><span class="act-time-badge">${act.time}</span>${noteTA}</div></div></div></td>`;
+      actCell = `<td class="activity"><div class="act-row"><div class="act-icon ${catCSSClass(rowAct.cat)}">${rowAct.icon}</div><div class="act-text"><div class="act-label">${label}</div><div class="act-daily-row"><span class="act-time-badge">${rowAct.time}</span>${noteTA}</div></div></div></td>`;
     } else {
       let noteDot = '';
       if(dates.some(d => localGetNote(currentUser, formatISO(d), act.id)))
         noteDot = `<span class="note-dot" title="Notes added this week">💬</span>`;
-      actCell = `<td class="activity"><div class="act-row"><div class="act-icon ${catCSSClass(act.cat)}">${act.icon}</div><div class="act-text"><div class="act-label">${label}</div><div class="act-time">${act.time}</div>${noteDot}</div></div></td>`;
+      actCell = `<td class="activity"><div class="act-row"><div class="act-icon ${catCSSClass(rowAct.cat)}">${rowAct.icon}</div><div class="act-text"><div class="act-label">${label}</div><div class="act-time">${rowAct.time}</div>${noteDot}</div></div></td>`;
     }
     tbody += actCell;
 
