@@ -670,6 +670,10 @@
     </div>
 
     <div class="app-section hidden" id="sportsSection">
+      <div class="switcher-modes" id="sportsModeSwitch" style="justify-content:center;margin-bottom:12px;">
+        <button class="mode-btn active" data-smode="day">Day</button>
+        <button class="mode-btn" data-smode="weekly">Weekly</button>
+      </div>
       <div class="sports-week-nav">
         <button id="sportsPrevBtn">‹</button>
         <span class="range" id="sportsWeekRange">Loading…</span>
@@ -2452,6 +2456,8 @@ const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Frid
 const MEAL_SLOTS = ['Breakfast','Lunch','Dinner','Snack'];
 
 let sportsWeekOffset = 0;
+let sportsViewMode = 'day'; // 'day' | 'weekly'
+let sportsDayIndex = new Date().getDay(); // 0=Sun..6=Sat — which day Day-mode is showing
 let sportsPlan = null;   // array of 7 { day, intensity, sessions:[{id,label,detail,icon}], notes } or null
 let sportsDone = {};     // { sessionId: true }
 let foodDefs = [];       // [{id,name,kcal,protein,unit}]
@@ -2546,14 +2552,23 @@ document.getElementById('appTabs').addEventListener('click', e => {
 });
 
 /* ── Sports plan: load + render ── */
-async function loadSportsPlan(){
+function renderSportsRangeLabel(){
   const dates = getSportsWeekDates();
-  const weekStart = formatISO(dates[0]);
   const first = dates[0], last = dates[6];
-  document.getElementById('sportsWeekRange').textContent =
-    first.getMonth() === last.getMonth()
-      ? `${MONTH_NAMES[first.getMonth()]} ${first.getDate()}–${last.getDate()}`
-      : `${MONTH_NAMES[first.getMonth()]} ${first.getDate()} – ${MONTH_NAMES[last.getMonth()]} ${last.getDate()}`;
+  if(sportsViewMode === 'day'){
+    const d = dates[sportsDayIndex];
+    document.getElementById('sportsWeekRange').textContent = `${DAY_NAMES_FULL[sportsDayIndex]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+  } else {
+    document.getElementById('sportsWeekRange').textContent =
+      first.getMonth() === last.getMonth()
+        ? `${MONTH_NAMES[first.getMonth()]} ${first.getDate()}–${last.getDate()}`
+        : `${MONTH_NAMES[first.getMonth()]} ${first.getDate()} – ${MONTH_NAMES[last.getMonth()]} ${last.getDate()}`;
+  }
+}
+
+async function loadSportsPlan(){
+  const weekStart = formatISO(getSportsWeekDates()[0]);
+  renderSportsRangeLabel();
   document.getElementById('sportsPlanHost').innerHTML = '<div class="sports-empty">Loading…</div>';
   try{
     const res = await apiGetSportsPlan(currentUser, weekStart);
@@ -2565,6 +2580,28 @@ async function loadSportsPlan(){
   renderSportsPlan();
 }
 
+function renderSportsDayCard(day, i, dates){
+  const iso = formatISO(dates[i] || dates[0]);
+  const isToday = iso === todayISO;
+  const sessions = (day.sessions || []).map(s => {
+    const checked = !!sportsDone[s.id];
+    return `<div class="sports-session-row">
+      <button class="sports-session-check${checked?' checked':''}" data-sid="${s.id}">${checked?'✓':''}</button>
+      <div class="sports-session-text">
+        <div class="sports-session-label${checked?' checked':''}">${s.icon?s.icon+' ':''}${escapeHtml(s.label||'')}</div>
+        ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Rest day</div>';
+  return `<div class="sports-day-card">
+    <div class="sports-day-head">
+      <span class="sports-day-name${isToday?' today':''}">${escapeHtml(day.day || DAY_NAMES_FULL[i])}</span>
+      ${day.intensity ? `<span class="sports-day-intensity">${escapeHtml(day.intensity)}</span>` : ''}
+    </div>
+    ${sessions}
+  </div>`;
+}
+
 function renderSportsPlan(){
   const host = document.getElementById('sportsPlanHost');
   if(!sportsPlan || !sportsPlan.length){
@@ -2572,27 +2609,12 @@ function renderSportsPlan(){
     return;
   }
   const dates = getSportsWeekDates();
-  host.innerHTML = sportsPlan.map((day, i) => {
-    const iso = formatISO(dates[i] || dates[0]);
-    const isToday = iso === todayISO;
-    const sessions = (day.sessions || []).map(s => {
-      const checked = !!sportsDone[s.id];
-      return `<div class="sports-session-row">
-        <button class="sports-session-check${checked?' checked':''}" data-sid="${s.id}">${checked?'✓':''}</button>
-        <div class="sports-session-text">
-          <div class="sports-session-label${checked?' checked':''}">${s.icon?s.icon+' ':''}${escapeHtml(s.label||'')}</div>
-          ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
-        </div>
-      </div>`;
-    }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Rest day</div>';
-    return `<div class="sports-day-card">
-      <div class="sports-day-head">
-        <span class="sports-day-name${isToday?' today':''}">${escapeHtml(day.day || DAY_NAMES_FULL[i])}</span>
-        ${day.intensity ? `<span class="sports-day-intensity">${escapeHtml(day.intensity)}</span>` : ''}
-      </div>
-      ${sessions}
-    </div>`;
-  }).join('');
+  if(sportsViewMode === 'day'){
+    const day = sportsPlan[sportsDayIndex] || { day: DAY_NAMES_FULL[sportsDayIndex], sessions: [] };
+    host.innerHTML = renderSportsDayCard(day, sportsDayIndex, dates);
+  } else {
+    host.innerHTML = sportsPlan.map((day, i) => renderSportsDayCard(day, i, dates)).join('');
+  }
 
   host.querySelectorAll('.sports-session-check').forEach(btn =>
     btn.addEventListener('click', () => toggleSportsSessionUI(btn.dataset.sid))
@@ -2607,8 +2629,34 @@ async function toggleSportsSessionUI(sid){
   try{ await apiToggleSportsSession(currentUser, weekStart, sid, checked); }catch(e){}
 }
 
-document.getElementById('sportsPrevBtn').addEventListener('click', () => { sportsWeekOffset--; loadSportsPlan(); });
-document.getElementById('sportsNextBtn').addEventListener('click', () => { sportsWeekOffset++; loadSportsPlan(); });
+document.getElementById('sportsModeSwitch').addEventListener('click', e => {
+  const btn = e.target.closest('.mode-btn');
+  if(!btn || btn.dataset.smode === sportsViewMode) return;
+  sportsViewMode = btn.dataset.smode;
+  document.querySelectorAll('#sportsModeSwitch .mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if(sportsViewMode === 'day') sportsDayIndex = new Date().getDay();
+  renderSportsRangeLabel();
+  renderSportsPlan();
+});
+
+document.getElementById('sportsPrevBtn').addEventListener('click', () => {
+  if(sportsViewMode === 'day'){
+    sportsDayIndex--;
+    if(sportsDayIndex < 0){ sportsDayIndex = 6; sportsWeekOffset--; loadSportsPlan(); return; }
+    renderSportsRangeLabel(); renderSportsPlan();
+  } else {
+    sportsWeekOffset--; loadSportsPlan();
+  }
+});
+document.getElementById('sportsNextBtn').addEventListener('click', () => {
+  if(sportsViewMode === 'day'){
+    sportsDayIndex++;
+    if(sportsDayIndex > 6){ sportsDayIndex = 0; sportsWeekOffset++; loadSportsPlan(); return; }
+    renderSportsRangeLabel(); renderSportsPlan();
+  } else {
+    sportsWeekOffset++; loadSportsPlan();
+  }
+});
 
 /* ── Sports plan editor ── */
 function openSportsEditModal(){
