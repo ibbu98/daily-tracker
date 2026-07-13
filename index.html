@@ -10,6 +10,7 @@
 <title>Daily Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#12171A;
@@ -503,6 +504,76 @@
     .switchuser-link button{font-size:12px;min-height:40px;}
   }
 
+  /* ── App section switcher (Tracker / Sports & Diet) ── */
+  .app-tabs{display:flex;gap:8px;justify-content:center;margin:0 0 16px;}
+  .app-tab-btn{padding:8px 20px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .15s,color .15s,background .15s;}
+  .app-tab-btn.active{border-color:var(--teal);color:var(--teal);background:rgba(82,191,152,0.08);}
+  .app-section.hidden{display:none;}
+
+  /* ── Sports plan ── */
+  .sports-week-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px;}
+  .sports-week-nav button{padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .sports-week-nav .range{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink);}
+  .sports-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;}
+  .sports-actions button{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+  .sports-actions button:hover{border-color:var(--teal);color:var(--teal);}
+  .sports-day-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;}
+  .sports-day-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .sports-day-name{font-weight:700;font-size:14px;}
+  .sports-day-name.today{color:var(--teal);}
+  .sports-day-intensity{font-size:10.5px;padding:2px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
+  .sports-session-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
+  .sports-session-row:first-of-type{border-top:none;}
+  .sports-session-check{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;color:var(--check-mark);font-size:13px;}
+  .sports-session-check.checked{background:var(--teal);border-color:var(--teal);}
+  .sports-session-text{flex:1;min-width:0;}
+  .sports-session-label{font-size:13.5px;font-weight:600;}
+  .sports-session-label.checked{text-decoration:line-through;color:var(--ink-soft);}
+  .sports-session-detail{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+  .sports-empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:24px 0;}
+
+  /* ── Sports plan editor modal ── */
+  .sports-edit-day{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .sports-edit-day-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .sports-edit-day-head input[type=text]{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);font-size:12.5px;width:140px;}
+  .sports-edit-session-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .sports-edit-session-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
+  .sports-edit-session-row input.sess-label{flex:1.4;min-width:0;}
+  .sports-edit-session-row input.sess-detail{flex:2;min-width:0;}
+  .sports-edit-session-row button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;padding:2px 6px;flex:none;}
+  .sports-add-session-btn{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;}
+
+  /* ── Diet ── */
+  .diet-total-bar{display:flex;gap:16px;justify-content:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px;}
+  .diet-total-item{text-align:center;}
+  .diet-total-item .val{font-size:20px;font-weight:700;color:var(--teal);}
+  .diet-total-item .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;}
+  .meal-slot{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;}
+  .meal-slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .meal-slot-title{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);font-family:'IBM Plex Mono',monospace;}
+  .meal-slot-kcal{font-size:11.5px;color:var(--ink-soft);}
+  .food-entry-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);}
+  .food-entry-row:first-of-type{border-top:none;}
+  .food-entry-name{font-size:13px;flex:1;min-width:0;}
+  .food-entry-macro{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
+  .food-entry-remove{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;padding:2px 6px;}
+  .food-add-row{display:flex;gap:6px;margin-top:8px;}
+  .food-add-row select{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
+  .food-add-row input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
+  .food-add-row button{padding:7px 12px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
+  .manage-foods-btn{display:block;margin:0 auto 16px;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+  .food-def-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .food-def-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
+  .food-def-row input.fd-name{flex:2;min-width:0;}
+  .food-def-row input.fd-num{width:64px;}
+  .food-def-row input.fd-unit{width:80px;}
+  .food-def-row button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;padding:2px 6px;}
+
+  @media (max-width:640px){
+    .food-add-row{flex-wrap:wrap;}
+    .food-add-row select{flex-basis:100%;}
+    .diet-total-bar{gap:10px;}
+  }
 </style>
 </head>
 <body>
@@ -569,27 +640,53 @@
 
   <div class="app" id="app">
     <div class="switcher" id="switcher"></div>
-    <div class="weeknav">
-      <button class="navbtn" id="prevBtn">‹</button>
-      <div class="weekrange-wrap">
-        <label class="weekrange" for="datePicker" id="weekRange">Loading…</label>
-        <input type="date" id="datePicker">
-      </div>
-      <button class="navbtn" id="nextBtn">›</button>
-      <button class="todaybtn" id="todayBtn">This week</button>
+    <div class="app-tabs" id="appTabs">
+      <button class="app-tab-btn active" data-section="tracker">📿 Tracker</button>
+      <button class="app-tab-btn" data-section="sports">🏃 Sports &amp; Diet</button>
     </div>
-    <div id="errorHost"></div>
-    <div class="quote-card" id="quoteCard"></div>
-    <div class="duo-medallions" id="duoMedallions"></div>
-    <div class="tablecard">
-      <div class="scrollx">
-        <div id="tableHost" class="loading">Loading your week…</div>
+
+    <div class="app-section" id="trackerSection">
+      <div class="weeknav">
+        <button class="navbtn" id="prevBtn">‹</button>
+        <div class="weekrange-wrap">
+          <label class="weekrange" for="datePicker" id="weekRange">Loading…</label>
+          <input type="date" id="datePicker">
+        </div>
+        <button class="navbtn" id="nextBtn">›</button>
+        <button class="todaybtn" id="todayBtn">This week</button>
       </div>
+      <div id="errorHost"></div>
+      <div class="quote-card" id="quoteCard"></div>
+      <div class="duo-medallions" id="duoMedallions"></div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <div id="tableHost" class="loading">Loading your week…</div>
+        </div>
+      </div>
+      <div id="undoHost"></div>
+      <div id="resetHost"></div>
+      <div id="photoDayHost"></div>
+      <div class="duo-stats" id="duoStats"></div>
     </div>
-    <div id="undoHost"></div>
-    <div id="resetHost"></div>
-    <div id="photoDayHost"></div>
-    <div class="duo-stats" id="duoStats"></div>
+
+    <div class="app-section hidden" id="sportsSection">
+      <div class="sports-week-nav">
+        <button id="sportsPrevBtn">‹</button>
+        <span class="range" id="sportsWeekRange">Loading…</span>
+        <button id="sportsNextBtn">›</button>
+      </div>
+      <div class="sports-actions">
+        <button id="sportsEditBtn">✏️ Edit this week's plan</button>
+        <button id="sportsUploadBtn">📤 Upload Excel</button>
+        <input type="file" id="sportsUploadInput" accept=".xlsx,.xls" style="display:none">
+      </div>
+      <div id="sportsPlanHost"></div>
+
+      <div class="diet-total-bar" id="dietTotalBar"></div>
+      <button class="manage-foods-btn" id="manageFoodsBtn">🍎 Manage my foods</button>
+      <div id="dietHost"></div>
+    </div>
+
     <div class="switchuser-link"><button id="logoutBtn">Sign out</button></div>
   </div>
 </div>
@@ -629,6 +726,33 @@
     </div>
     <div class="edit-actions" style="margin-top:16px;">
       <button class="edit-cancel-btn" id="scopeCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="sportsEditModalOverlay">
+  <div class="edit-modal">
+    <h3>Edit this week's plan</h3>
+    <div id="sportsEditDays"></div>
+    <div class="edit-actions">
+      <button class="edit-cancel-btn" id="sportsEditCancelBtn">Cancel</button>
+      <button class="edit-save-btn" id="sportsEditSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="foodDefModalOverlay">
+  <div class="edit-modal">
+    <h3>My Foods</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:4px 0 14px;">Set the calories and protein per serving once — then just pick from the list when logging a meal.</p>
+    <div class="edit-col-headers">
+      <span style="grid-column:span 2">Food name</span><span>Kcal</span><span>Protein</span><span></span>
+    </div>
+    <div id="foodDefRows"></div>
+    <button class="edit-add-btn" id="foodDefAddBtn">+ Add food</button>
+    <div class="edit-actions">
+      <button class="edit-cancel-btn" id="foodDefCancelBtn">Cancel</button>
+      <button class="edit-save-btn" id="foodDefSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -2320,6 +2444,442 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
     }, 400);
   });
 })();
+
+/* ═══════════════════════════════════════════════
+   SPORTS & DIET
+   ═══════════════════════════════════════════════ */
+const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MEAL_SLOTS = ['Breakfast','Lunch','Dinner','Snack'];
+
+let sportsWeekOffset = 0;
+let sportsPlan = null;   // array of 7 { day, intensity, sessions:[{id,label,detail,icon}], notes } or null
+let sportsDone = {};     // { sessionId: true }
+let foodDefs = [];       // [{id,name,kcal,protein,unit}]
+let foodLogEntries = []; // [{id,foodId,name,qty,kcal,protein,meal}]
+let sportsInitialized = false;
+
+function genId(prefix){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
+
+function sportsStartOfWeek(d){
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  dt.setDate(dt.getDate() - dt.getDay()); // back up to Sunday
+  return dt;
+}
+function getSportsWeekDates(){
+  const base = sportsStartOfWeek(new Date());
+  base.setDate(base.getDate() + sportsWeekOffset * 7);
+  return Array.from({length:7}, (_, i) => { const d = new Date(base); d.setDate(base.getDate() + i); return d; });
+}
+
+/* ── API ── */
+async function apiGetSportsPlan(user, weekStart){
+  const url = `${API_URL}?action=getSportsPlan&user=${encodeURIComponent(user)}&weekStart=${weekStart}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to load plan');
+  return json;
+}
+async function apiSaveSportsPlan(user, weekStart, plan){
+  const url = `${API_URL}?action=saveSportsPlan&user=${encodeURIComponent(user)}&weekStart=${weekStart}&plan=${encodeURIComponent(JSON.stringify(plan))}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url, 15000);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to save plan');
+  return json;
+}
+async function apiToggleSportsSession(user, weekStart, sessionId, checked){
+  const url = `${API_URL}?action=toggleSportsSession&user=${encodeURIComponent(user)}&weekStart=${weekStart}&sessionId=${encodeURIComponent(sessionId)}&checked=${checked}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to save');
+  return json;
+}
+async function apiGetFoodDefs(user){
+  const url = `${API_URL}?action=getFoodDefs&user=${encodeURIComponent(user)}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to load foods');
+  return json;
+}
+async function apiSaveFoodDefs(user, foods){
+  const url = `${API_URL}?action=saveFoodDefs&user=${encodeURIComponent(user)}&foods=${encodeURIComponent(JSON.stringify(foods))}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url, 15000);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to save foods');
+  return json;
+}
+async function apiGetFoodLog(user, date){
+  const url = `${API_URL}?action=getFoodLog&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to load food log');
+  return json;
+}
+async function apiSaveFoodLog(user, date, entries){
+  const url = `${API_URL}?action=saveFoodLog&user=${encodeURIComponent(user)}&date=${date}&entries=${encodeURIComponent(JSON.stringify(entries))}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url, 15000);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to save food log');
+  return json;
+}
+
+/* ── Tab switcher ── */
+document.getElementById('appTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.app-tab-btn');
+  if(!btn) return;
+  document.querySelectorAll('.app-tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const section = btn.dataset.section;
+  document.getElementById('trackerSection').classList.toggle('hidden', section !== 'tracker');
+  document.getElementById('sportsSection').classList.toggle('hidden', section !== 'sports');
+  if(section === 'sports' && !sportsInitialized){
+    sportsInitialized = true;
+    loadSportsPlan();
+    loadDiet();
+  }
+});
+
+/* ── Sports plan: load + render ── */
+async function loadSportsPlan(){
+  const dates = getSportsWeekDates();
+  const weekStart = formatISO(dates[0]);
+  const first = dates[0], last = dates[6];
+  document.getElementById('sportsWeekRange').textContent =
+    first.getMonth() === last.getMonth()
+      ? `${MONTH_NAMES[first.getMonth()]} ${first.getDate()}–${last.getDate()}`
+      : `${MONTH_NAMES[first.getMonth()]} ${first.getDate()} – ${MONTH_NAMES[last.getMonth()]} ${last.getDate()}`;
+  document.getElementById('sportsPlanHost').innerHTML = '<div class="sports-empty">Loading…</div>';
+  try{
+    const res = await apiGetSportsPlan(currentUser, weekStart);
+    sportsPlan = res.plan;
+    sportsDone = res.done || {};
+  }catch(e){
+    sportsPlan = null; sportsDone = {};
+  }
+  renderSportsPlan();
+}
+
+function renderSportsPlan(){
+  const host = document.getElementById('sportsPlanHost');
+  if(!sportsPlan || !sportsPlan.length){
+    host.innerHTML = `<div class="sports-empty">No plan set for this week yet.<br>Tap "Edit this week's plan" or upload an Excel file.</div>`;
+    return;
+  }
+  const dates = getSportsWeekDates();
+  host.innerHTML = sportsPlan.map((day, i) => {
+    const iso = formatISO(dates[i] || dates[0]);
+    const isToday = iso === todayISO;
+    const sessions = (day.sessions || []).map(s => {
+      const checked = !!sportsDone[s.id];
+      return `<div class="sports-session-row">
+        <button class="sports-session-check${checked?' checked':''}" data-sid="${s.id}">${checked?'✓':''}</button>
+        <div class="sports-session-text">
+          <div class="sports-session-label${checked?' checked':''}">${s.icon?s.icon+' ':''}${escapeHtml(s.label||'')}</div>
+          ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Rest day</div>';
+    return `<div class="sports-day-card">
+      <div class="sports-day-head">
+        <span class="sports-day-name${isToday?' today':''}">${escapeHtml(day.day || DAY_NAMES_FULL[i])}</span>
+        ${day.intensity ? `<span class="sports-day-intensity">${escapeHtml(day.intensity)}</span>` : ''}
+      </div>
+      ${sessions}
+    </div>`;
+  }).join('');
+
+  host.querySelectorAll('.sports-session-check').forEach(btn =>
+    btn.addEventListener('click', () => toggleSportsSessionUI(btn.dataset.sid))
+  );
+}
+
+async function toggleSportsSessionUI(sid){
+  const checked = !sportsDone[sid];
+  if(checked) sportsDone[sid] = true; else delete sportsDone[sid];
+  renderSportsPlan();
+  const weekStart = formatISO(getSportsWeekDates()[0]);
+  try{ await apiToggleSportsSession(currentUser, weekStart, sid, checked); }catch(e){}
+}
+
+document.getElementById('sportsPrevBtn').addEventListener('click', () => { sportsWeekOffset--; loadSportsPlan(); });
+document.getElementById('sportsNextBtn').addEventListener('click', () => { sportsWeekOffset++; loadSportsPlan(); });
+
+/* ── Sports plan editor ── */
+function openSportsEditModal(){
+  const dates = getSportsWeekDates();
+  const plan = (sportsPlan && sportsPlan.length ? sportsPlan : dates.map((d,i) => ({ day: DAY_NAMES_FULL[i], intensity:'', sessions:[] })));
+  renderSportsEditDays(plan);
+  document.getElementById('sportsEditModalOverlay').classList.remove('hidden');
+}
+function renderSportsEditDays(plan){
+  document.getElementById('sportsEditDays').innerHTML = plan.map((day, di) => {
+    const sessRows = (day.sessions || []).map(s => `
+      <div class="sports-edit-session-row" data-sid="${s.id || genId('s')}">
+        <input type="text" class="sess-label" placeholder="e.g. Easy Run" value="${escapeHtml(s.label||'')}">
+        <input type="text" class="sess-detail" placeholder="e.g. 6K @ 6:40/km" value="${escapeHtml(s.detail||'')}">
+        <button type="button" class="sess-del-btn">✕</button>
+      </div>`).join('');
+    return `<div class="sports-edit-day" data-di="${di}">
+      <div class="sports-edit-day-head">
+        <strong>${DAY_NAMES_FULL[di]}</strong>
+        <input type="text" class="day-intensity" placeholder="Intensity (e.g. Easy)" value="${escapeHtml(day.intensity||'')}">
+      </div>
+      <div class="sports-edit-sessions">${sessRows}</div>
+      <button type="button" class="sports-add-session-btn">+ Add session</button>
+    </div>`;
+  }).join('');
+}
+document.getElementById('sportsEditDays').addEventListener('click', e => {
+  const addBtn = e.target.closest('.sports-add-session-btn');
+  if(addBtn){
+    const container = addBtn.previousElementSibling;
+    const div = document.createElement('div');
+    div.className = 'sports-edit-session-row';
+    div.dataset.sid = genId('s');
+    div.innerHTML = `<input type="text" class="sess-label" placeholder="e.g. Easy Run"><input type="text" class="sess-detail" placeholder="e.g. 6K @ 6:40/km"><button type="button" class="sess-del-btn">✕</button>`;
+    container.appendChild(div);
+    return;
+  }
+  const delBtn = e.target.closest('.sess-del-btn');
+  if(delBtn) delBtn.closest('.sports-edit-session-row').remove();
+});
+function readSportsEditDays(){
+  return Array.from(document.querySelectorAll('.sports-edit-day')).map(dayEl => {
+    const di = Number(dayEl.dataset.di);
+    const intensity = dayEl.querySelector('.day-intensity').value.trim();
+    const sessions = Array.from(dayEl.querySelectorAll('.sports-edit-session-row'))
+      .map(row => ({
+        id: row.dataset.sid,
+        label: row.querySelector('.sess-label').value.trim(),
+        detail: row.querySelector('.sess-detail').value.trim(),
+      }))
+      .filter(s => s.label);
+    return { day: DAY_NAMES_FULL[di], intensity, sessions };
+  });
+}
+document.getElementById('sportsEditBtn').addEventListener('click', openSportsEditModal);
+document.getElementById('sportsEditCancelBtn').addEventListener('click', () =>
+  document.getElementById('sportsEditModalOverlay').classList.add('hidden'));
+document.getElementById('sportsEditModalOverlay').addEventListener('click', e => {
+  if(e.target === document.getElementById('sportsEditModalOverlay'))
+    document.getElementById('sportsEditModalOverlay').classList.add('hidden');
+});
+document.getElementById('sportsEditSaveBtn').addEventListener('click', async () => {
+  const plan = readSportsEditDays();
+  sportsPlan = plan;
+  renderSportsPlan();
+  document.getElementById('sportsEditModalOverlay').classList.add('hidden');
+  try{
+    await apiSaveSportsPlan(currentUser, formatISO(getSportsWeekDates()[0]), plan);
+    setSyncBadge('cloud', 'Plan saved ✓');
+    setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
+  }catch(e){ setSyncBadge('err', 'Could not save plan — try again'); }
+});
+
+/* ── Excel upload ── */
+document.getElementById('sportsUploadBtn').addEventListener('click', () =>
+  document.getElementById('sportsUploadInput').click());
+document.getElementById('sportsUploadInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  try{
+    const buf = await file.arrayBuffer();
+    const wb  = XLSX.read(buf, { type:'array' });
+    const parsed = parseWeekPlanWorkbook(wb);
+    if(!parsed){ alert('Could not find a "Day / Intensity / AM Session / PM Session" table in that file.'); return; }
+    sportsPlan = parsed;
+    renderSportsPlan();
+    await apiSaveSportsPlan(currentUser, formatISO(getSportsWeekDates()[0]), parsed);
+    setSyncBadge('cloud', 'Plan uploaded ✓');
+    setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
+  }catch(err){
+    alert('Could not read that file: ' + err.message);
+  }
+});
+// Looks for a sheet with a header row containing "Day" and "Intensity" columns
+// (matching the MARATHON WEEK PLAN layout), then reads AM/PM Session + Volume
+// into checkable sessions for each of the following 7 rows.
+function parseWeekPlanWorkbook(wb){
+  const sheetName = wb.SheetNames.find(n => /week ?plan/i.test(n)) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+
+  let headerIdx = -1;
+  for(let i = 0; i < rows.length; i++){
+    const row = rows[i].map(c => String(c).trim().toLowerCase());
+    if(row.includes('day') && row.includes('intensity')){ headerIdx = i; break; }
+  }
+  if(headerIdx === -1) return null;
+
+  const header = rows[headerIdx].map(c => String(c).trim().toLowerCase());
+  const idx = name => header.indexOf(name);
+  const cDay = idx('day'), cInt = idx('intensity');
+  const cAmS = idx('am session'), cAmV = idx('am volume');
+  const cPmS = idx('pm session'), cPmV = idx('pm volume');
+  const cNotes = idx('key notes');
+
+  const days = [];
+  for(let i = headerIdx + 1; i < rows.length && days.length < 7; i++){
+    const row = rows[i];
+    const dayName = String(row[cDay] || '').trim();
+    if(!dayName) continue;
+    const sessions = [];
+    if(cAmS > -1){
+      const label = String(row[cAmS] || '').trim();
+      if(label && !/^rest$/i.test(label)) sessions.push({ id: genId('s'), label, detail: cAmV>-1 ? String(row[cAmV]||'').trim() : '' });
+    }
+    if(cPmS > -1){
+      const label = String(row[cPmS] || '').trim();
+      if(label && !/^rest$/i.test(label)) sessions.push({ id: genId('s'), label, detail: cPmV>-1 ? String(row[cPmV]||'').trim() : '' });
+    }
+    days.push({
+      day: dayName,
+      intensity: cInt>-1 ? String(row[cInt]||'').trim() : '',
+      sessions,
+      notes: cNotes>-1 ? String(row[cNotes]||'').trim() : ''
+    });
+  }
+  return days.length ? days : null;
+}
+
+/* ── Diet ── */
+async function loadDiet(){
+  try{
+    const [defsRes, logRes] = await Promise.all([
+      apiGetFoodDefs(currentUser),
+      apiGetFoodLog(currentUser, todayISO)
+    ]);
+    foodDefs = defsRes.foods || [];
+    foodLogEntries = logRes.entries || [];
+  }catch(e){
+    foodDefs = []; foodLogEntries = [];
+  }
+  renderDiet();
+}
+
+function renderDiet(){
+  const totalKcal    = foodLogEntries.reduce((s,e) => s + (e.kcal||0), 0);
+  const totalProtein = foodLogEntries.reduce((s,e) => s + (e.protein||0), 0);
+  document.getElementById('dietTotalBar').innerHTML = `
+    <div class="diet-total-item"><div class="val">${Math.round(totalKcal)}</div><div class="lbl">Kcal today</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totalProtein)}g</div><div class="lbl">Protein today</div></div>
+  `;
+
+  const foodOptions = foodDefs.map(f =>
+    `<option value="${f.id}">${escapeHtml(f.name)} — ${f.kcal} kcal, ${f.protein}g${f.unit ? ' / '+escapeHtml(f.unit) : ''}</option>`
+  ).join('');
+
+  document.getElementById('dietHost').innerHTML = MEAL_SLOTS.map(meal => {
+    const entries  = foodLogEntries.filter(e => e.meal === meal);
+    const mealKcal = entries.reduce((s,e) => s + (e.kcal||0), 0);
+    const rows = entries.map(e => `
+      <div class="food-entry-row">
+        <span class="food-entry-name">${escapeHtml(e.name)} × ${e.qty}</span>
+        <span class="food-entry-macro">${Math.round(e.kcal)} kcal · ${Math.round(e.protein)}g</span>
+        <button class="food-entry-remove" data-eid="${e.id}">✕</button>
+      </div>`).join('');
+    return `<div class="meal-slot" data-meal="${meal}">
+      <div class="meal-slot-head">
+        <span class="meal-slot-title">${meal}</span>
+        <span class="meal-slot-kcal">${Math.round(mealKcal)} kcal</span>
+      </div>
+      ${rows}
+      <div class="food-add-row">
+        <select class="food-select">${foodDefs.length ? foodOptions : '<option value="">Add foods below first</option>'}</select>
+        <input type="number" class="food-qty" value="1" min="0.25" step="0.25">
+        <button type="button" class="food-add-btn"${foodDefs.length?'':' disabled'}>+ Add</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.food-entry-remove').forEach(btn =>
+    btn.addEventListener('click', () => removeFoodEntry(btn.dataset.eid)));
+  document.querySelectorAll('.food-add-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const slot   = btn.closest('.meal-slot');
+      const sel    = slot.querySelector('.food-select');
+      const qtyInp = slot.querySelector('.food-qty');
+      const food   = foodDefs.find(f => f.id === sel.value);
+      if(!food) return;
+      const qty = parseFloat(qtyInp.value) || 1;
+      addFoodEntry(slot.dataset.meal, food, qty);
+    }));
+}
+
+async function addFoodEntry(meal, food, qty){
+  foodLogEntries.push({
+    id: genId('e'), foodId: food.id, name: food.name, qty,
+    kcal: Math.round(food.kcal * qty * 10) / 10,
+    protein: Math.round(food.protein * qty * 10) / 10,
+    meal
+  });
+  renderDiet();
+  try{ await apiSaveFoodLog(currentUser, todayISO, foodLogEntries); }catch(e){}
+}
+async function removeFoodEntry(id){
+  foodLogEntries = foodLogEntries.filter(e => e.id !== id);
+  renderDiet();
+  try{ await apiSaveFoodLog(currentUser, todayISO, foodLogEntries); }catch(e){}
+}
+
+/* ── Food definitions manager ── */
+function openFoodDefModal(){
+  renderFoodDefRows(foodDefs);
+  document.getElementById('foodDefModalOverlay').classList.remove('hidden');
+}
+function renderFoodDefRows(foods){
+  document.getElementById('foodDefRows').innerHTML = foods.map(f => `
+    <div class="food-def-row" data-fid="${f.id || genId('f')}">
+      <input type="text" class="fd-name" placeholder="Food name" value="${escapeHtml(f.name||'')}">
+      <input type="number" class="fd-num fd-kcal" placeholder="Kcal" value="${f.kcal||''}">
+      <input type="number" class="fd-num fd-protein" placeholder="Protein" value="${f.protein||''}">
+      <input type="text" class="fd-unit" placeholder="Unit (e.g. 1 bowl)" value="${escapeHtml(f.unit||'')}">
+      <button type="button" class="fd-del-btn">✕</button>
+    </div>`).join('');
+}
+document.getElementById('foodDefRows').addEventListener('click', e => {
+  const del = e.target.closest('.fd-del-btn');
+  if(del) del.closest('.food-def-row').remove();
+});
+document.getElementById('foodDefAddBtn').addEventListener('click', () => {
+  const container = document.getElementById('foodDefRows');
+  const div = document.createElement('div');
+  div.className = 'food-def-row';
+  div.dataset.fid = genId('f');
+  div.innerHTML = `<input type="text" class="fd-name" placeholder="Food name"><input type="number" class="fd-num fd-kcal" placeholder="Kcal"><input type="number" class="fd-num fd-protein" placeholder="Protein"><input type="text" class="fd-unit" placeholder="Unit (e.g. 1 bowl)"><button type="button" class="fd-del-btn">✕</button>`;
+  container.appendChild(div);
+});
+document.getElementById('foodDefSaveBtn').addEventListener('click', async () => {
+  const foods = Array.from(document.querySelectorAll('.food-def-row')).map(row => ({
+    id: row.dataset.fid,
+    name: row.querySelector('.fd-name').value.trim(),
+    kcal: parseFloat(row.querySelector('.fd-kcal').value) || 0,
+    protein: parseFloat(row.querySelector('.fd-protein').value) || 0,
+    unit: row.querySelector('.fd-unit').value.trim(),
+  })).filter(f => f.name);
+  foodDefs = foods;
+  document.getElementById('foodDefModalOverlay').classList.add('hidden');
+  try{
+    await apiSaveFoodDefs(currentUser, foods);
+    setSyncBadge('cloud', 'Foods saved ✓');
+    setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
+  }catch(e){ setSyncBadge('err', 'Could not save foods — try again'); }
+  renderDiet();
+});
+document.getElementById('manageFoodsBtn').addEventListener('click', openFoodDefModal);
+document.getElementById('foodDefCancelBtn').addEventListener('click', () =>
+  document.getElementById('foodDefModalOverlay').classList.add('hidden'));
+document.getElementById('foodDefModalOverlay').addEventListener('click', e => {
+  if(e.target === document.getElementById('foodDefModalOverlay'))
+    document.getElementById('foodDefModalOverlay').classList.add('hidden');
+});
 
 ;(function(){
   const tok  = sessionStorage.getItem('tracker:token');
