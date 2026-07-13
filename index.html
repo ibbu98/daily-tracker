@@ -536,10 +536,12 @@
   .sports-edit-day{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;}
   .sports-edit-day-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
   .sports-edit-day-head input[type=text]{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);font-size:12.5px;width:140px;}
-  .sports-edit-session-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
-  .sports-edit-session-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
-  .sports-edit-session-row input.sess-label{flex:1.4;min-width:0;}
-  .sports-edit-session-row input.sess-detail{flex:2;min-width:0;}
+  .sports-edit-session-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
+  .sports-edit-session-row input,.sports-edit-session-row select{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
+  .sports-edit-session-row select.sess-type{flex:1.3;min-width:118px;}
+  .sports-edit-session-row input.sess-label{flex:1.3;min-width:100px;}
+  .sports-edit-session-row input.sess-distance{flex:0.8;min-width:80px;}
+  .sports-edit-session-row input.sess-time{flex:0.9;min-width:90px;}
   .sports-edit-session-row button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;padding:2px 6px;flex:none;}
   .sports-add-session-btn{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;}
 
@@ -2454,6 +2456,15 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
    ═══════════════════════════════════════════════ */
 const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MEAL_SLOTS = ['Breakfast','Lunch','Dinner','Snack'];
+const SPORT_TYPES = [
+  { key:'Cycling',  icon:'🚴' },
+  { key:'Running',  icon:'🏃' },
+  { key:'Walking',  icon:'🚶' },
+  { key:'Swimming', icon:'🏊' },
+  { key:'Hiking',   icon:'🥾' },
+  { key:'Other',    icon:'⭐' },
+];
+function sportTypeIcon(key){ return (SPORT_TYPES.find(t => t.key === key) || {}).icon || ''; }
 
 let sportsWeekOffset = 0;
 let sportsViewMode = 'day'; // 'day' | 'weekly'
@@ -2665,14 +2676,23 @@ function openSportsEditModal(){
   renderSportsEditDays(plan);
   document.getElementById('sportsEditModalOverlay').classList.remove('hidden');
 }
+function sportsSessionRowHTML(s){
+  s = s || {};
+  const type = s.type || 'Other';
+  const showLabel = type === 'Other';
+  const typeOpts = SPORT_TYPES.map(t => `<option value="${t.key}"${type===t.key?' selected':''}>${t.icon} ${t.key}</option>`).join('');
+  return `
+    <div class="sports-edit-session-row" data-sid="${s.id || genId('s')}">
+      <select class="sess-type">${typeOpts}</select>
+      <input type="text" class="sess-label" placeholder="Custom name" value="${escapeHtml(s.label||'')}" style="${showLabel?'':'display:none'}">
+      <input type="text" class="sess-distance" placeholder="Distance (e.g. 6K)" value="${escapeHtml(s.distance||'')}">
+      <input type="text" class="sess-time" placeholder="Time (e.g. 42 min)" value="${escapeHtml(s.time||'')}">
+      <button type="button" class="sess-del-btn">✕</button>
+    </div>`;
+}
 function renderSportsEditDays(plan){
   document.getElementById('sportsEditDays').innerHTML = plan.map((day, di) => {
-    const sessRows = (day.sessions || []).map(s => `
-      <div class="sports-edit-session-row" data-sid="${s.id || genId('s')}">
-        <input type="text" class="sess-label" placeholder="e.g. Easy Run" value="${escapeHtml(s.label||'')}">
-        <input type="text" class="sess-detail" placeholder="e.g. 6K @ 6:40/km" value="${escapeHtml(s.detail||'')}">
-        <button type="button" class="sess-del-btn">✕</button>
-      </div>`).join('');
+    const sessRows = (day.sessions || []).map(sportsSessionRowHTML).join('');
     return `<div class="sports-edit-day" data-di="${di}">
       <div class="sports-edit-day-head">
         <strong>${DAY_NAMES_FULL[di]}</strong>
@@ -2688,25 +2708,37 @@ document.getElementById('sportsEditDays').addEventListener('click', e => {
   if(addBtn){
     const container = addBtn.previousElementSibling;
     const div = document.createElement('div');
-    div.className = 'sports-edit-session-row';
-    div.dataset.sid = genId('s');
-    div.innerHTML = `<input type="text" class="sess-label" placeholder="e.g. Easy Run"><input type="text" class="sess-detail" placeholder="e.g. 6K @ 6:40/km"><button type="button" class="sess-del-btn">✕</button>`;
-    container.appendChild(div);
+    div.innerHTML = sportsSessionRowHTML({});
+    container.appendChild(div.firstElementChild);
     return;
   }
   const delBtn = e.target.closest('.sess-del-btn');
   if(delBtn) delBtn.closest('.sports-edit-session-row').remove();
+});
+document.getElementById('sportsEditDays').addEventListener('change', e => {
+  const sel = e.target.closest('.sess-type');
+  if(!sel) return;
+  const labelInp = sel.closest('.sports-edit-session-row').querySelector('.sess-label');
+  labelInp.style.display = sel.value === 'Other' ? '' : 'none';
 });
 function readSportsEditDays(){
   return Array.from(document.querySelectorAll('.sports-edit-day')).map(dayEl => {
     const di = Number(dayEl.dataset.di);
     const intensity = dayEl.querySelector('.day-intensity').value.trim();
     const sessions = Array.from(dayEl.querySelectorAll('.sports-edit-session-row'))
-      .map(row => ({
-        id: row.dataset.sid,
-        label: row.querySelector('.sess-label').value.trim(),
-        detail: row.querySelector('.sess-detail').value.trim(),
-      }))
+      .map(row => {
+        const type     = row.querySelector('.sess-type').value;
+        const distance = row.querySelector('.sess-distance').value.trim();
+        const time     = row.querySelector('.sess-time').value.trim();
+        const custom   = row.querySelector('.sess-label').value.trim();
+        const label    = type === 'Other' ? custom : type;
+        return {
+          id: row.dataset.sid,
+          type, label, distance, time,
+          icon: type === 'Other' ? '' : sportTypeIcon(type),
+          detail: [distance, time].filter(Boolean).join(' · '),
+        };
+      })
       .filter(s => s.label);
     return { day: DAY_NAMES_FULL[di], intensity, sessions };
   });
@@ -2754,6 +2786,30 @@ document.getElementById('sportsUploadInput').addEventListener('change', async e 
 // Looks for a sheet with a header row containing "Day" and "Intensity" columns
 // (matching the MARATHON WEEK PLAN layout), then reads AM/PM Session + Volume
 // into checkable sessions for each of the following 7 rows.
+function guessSportType(label){
+  const l = label.toLowerCase();
+  if(/swim/.test(l))            return 'Swimming';
+  if(/cycl|\bbike\b/.test(l))   return 'Cycling';
+  if(/\brun/.test(l))           return 'Running';
+  if(/walk/.test(l))            return 'Walking';
+  if(/hik/.test(l))             return 'Hiking';
+  return 'Other';
+}
+function buildImportedSession(rawLabel, volume){
+  const type = guessSportType(rawLabel);
+  // Recognized types show their name + icon automatically, so the original
+  // free-text label (which usually carries the useful detail, e.g. "Swim —
+  // Freestyle") goes into the time field alongside the volume rather than
+  // being discarded.
+  const timeText = type === 'Other' ? volume : [rawLabel, volume].filter(Boolean).join(' — ');
+  return {
+    id: genId('s'), type,
+    label: type === 'Other' ? rawLabel : '',
+    distance: '', time: timeText,
+    icon: sportTypeIcon(type),
+    detail: timeText
+  };
+}
 function parseWeekPlanWorkbook(wb){
   const sheetName = wb.SheetNames.find(n => /week ?plan/i.test(n)) || wb.SheetNames[0];
   const ws = wb.Sheets[sheetName];
@@ -2781,11 +2837,11 @@ function parseWeekPlanWorkbook(wb){
     const sessions = [];
     if(cAmS > -1){
       const label = String(row[cAmS] || '').trim();
-      if(label && !/^rest$/i.test(label)) sessions.push({ id: genId('s'), label, detail: cAmV>-1 ? String(row[cAmV]||'').trim() : '' });
+      if(label && !/^rest$/i.test(label)) sessions.push(buildImportedSession(label, cAmV>-1 ? String(row[cAmV]||'').trim() : ''));
     }
     if(cPmS > -1){
       const label = String(row[cPmS] || '').trim();
-      if(label && !/^rest$/i.test(label)) sessions.push({ id: genId('s'), label, detail: cPmV>-1 ? String(row[cPmV]||'').trim() : '' });
+      if(label && !/^rest$/i.test(label)) sessions.push(buildImportedSession(label, cPmV>-1 ? String(row[cPmV]||'').trim() : ''));
     }
     days.push({
       day: dayName,
