@@ -563,6 +563,11 @@
   .food-add-row select{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
   .food-add-row input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
   .food-add-row button{padding:7px 12px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
+
+  .sports-add-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+  .sports-add-row select{flex:1.2;min-width:110px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
+  .sports-add-row input{flex:0.8;min-width:80px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
+  .sports-add-row button{padding:7px 14px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
   .manage-foods-btn{display:block;margin:0 auto 16px;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;}
   .food-def-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
   .food-def-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
@@ -2603,7 +2608,7 @@ function renderSportsDayCard(day, i, dates){
         ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
       </div>
     </div>`;
-  }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Rest day</div>';
+  }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Nothing logged yet.</div>';
   return `<div class="sports-day-card">
     <div class="sports-day-head">
       <span class="sports-day-name${isToday?' today':''}">${escapeHtml(day.day || DAY_NAMES_FULL[i])}</span>
@@ -2613,16 +2618,29 @@ function renderSportsDayCard(day, i, dates){
   </div>`;
 }
 
+function sportsQuickAddRowHTML(){
+  const typeOpts = SPORT_TYPES.filter(t => t.key !== 'Other').map(t => `<option value="${t.key}">${t.icon} ${t.key}</option>`).join('');
+  return `<div class="sports-add-row">
+    <select id="sportsQuickType">${typeOpts}</select>
+    <input type="text" id="sportsQuickDistance" placeholder="Distance (e.g. 6K)">
+    <input type="text" id="sportsQuickTime" placeholder="Time (e.g. 42 min)">
+    <button type="button" id="sportsQuickAddBtn">+ Log it</button>
+  </div>`;
+}
+
 function renderSportsPlan(){
   const host = document.getElementById('sportsPlanHost');
+  const showQuickAdd = sportsViewMode === 'day';
+
   if(!sportsPlan || !sportsPlan.length){
-    host.innerHTML = `<div class="sports-empty">No plan set for this week yet.<br>Tap "Edit this week's plan" or upload an Excel file.</div>`;
+    host.innerHTML = `<div class="sports-empty">No plan set for this week yet.</div>` + (showQuickAdd ? sportsQuickAddRowHTML() : '');
+    if(showQuickAdd) wireSportsQuickAdd();
     return;
   }
   const dates = getSportsWeekDates();
   if(sportsViewMode === 'day'){
     const day = sportsPlan[sportsDayIndex] || { day: DAY_NAMES_FULL[sportsDayIndex], sessions: [] };
-    host.innerHTML = renderSportsDayCard(day, sportsDayIndex, dates);
+    host.innerHTML = renderSportsDayCard(day, sportsDayIndex, dates) + sportsQuickAddRowHTML();
   } else {
     host.innerHTML = sportsPlan.map((day, i) => renderSportsDayCard(day, i, dates)).join('');
   }
@@ -2630,6 +2648,49 @@ function renderSportsPlan(){
   host.querySelectorAll('.sports-session-check').forEach(btn =>
     btn.addEventListener('click', () => toggleSportsSessionUI(btn.dataset.sid))
   );
+  if(showQuickAdd) wireSportsQuickAdd();
+}
+
+function wireSportsQuickAdd(){
+  const btn = document.getElementById('sportsQuickAddBtn');
+  if(!btn) return;
+  btn.addEventListener('click', () => {
+    const type     = document.getElementById('sportsQuickType').value;
+    const distance = document.getElementById('sportsQuickDistance').value.trim();
+    const time     = document.getElementById('sportsQuickTime').value.trim();
+    quickAddSportsSession(type, distance, time);
+  });
+}
+
+// Logs a completed session directly onto the currently viewed day — for
+// recording what you actually did, as opposed to the plan editor which is
+// for setting up sessions ahead of time. Added sessions are marked done
+// immediately since you're logging something you already finished.
+async function quickAddSportsSession(type, distance, time){
+  if(!sportsPlan || !sportsPlan.length){
+    sportsPlan = DAY_NAMES_FULL.map(name => ({ day: name, intensity:'', sessions:[] }));
+  }
+  const session = {
+    id: genId('s'), type,
+    label: '', distance, time,
+    icon: sportTypeIcon(type),
+    detail: [distance, time].filter(Boolean).join(' · ')
+  };
+  if(!sportsPlan[sportsDayIndex]) sportsPlan[sportsDayIndex] = { day: DAY_NAMES_FULL[sportsDayIndex], intensity:'', sessions:[] };
+  if(!sportsPlan[sportsDayIndex].sessions) sportsPlan[sportsDayIndex].sessions = [];
+  sportsPlan[sportsDayIndex].sessions.push(session);
+  sportsDone[session.id] = true;
+  renderSportsPlan();
+
+  const weekStart = formatISO(getSportsWeekDates()[0]);
+  try{
+    await Promise.all([
+      apiSaveSportsPlan(currentUser, weekStart, sportsPlan),
+      apiToggleSportsSession(currentUser, weekStart, session.id, true)
+    ]);
+    setSyncBadge('cloud', 'Logged ✓');
+    setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
+  }catch(e){ setSyncBadge('err', 'Could not save — try again'); }
 }
 
 async function toggleSportsSessionUI(sid){
