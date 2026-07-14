@@ -549,6 +549,7 @@
   .sports-add-session-btn{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;}
 
   /* ── Diet ── */
+  .diet-date-label{text-align:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:16px 0 8px;}
   .diet-target-row{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-bottom:1px dashed var(--line);border-radius:14px 14px 0 0;padding:10px 14px;margin-bottom:0;font-size:11.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
   .diet-target-row input{width:64px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--ink);font-size:12px;text-align:center;}
   .diet-total-bar{display:flex;gap:0;justify-content:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-top:none;border-radius:0 0 14px 14px;padding:14px 6px;margin-bottom:18px;}
@@ -705,6 +706,7 @@
       </div>
       <div id="sportsPlanHost"></div>
 
+      <div class="diet-date-label" id="dietDateLabel"></div>
       <div class="diet-target-row" id="dietTargetRow"></div>
       <div class="diet-total-bar" id="dietTotalBar"></div>
       <button class="manage-foods-btn" id="manageFoodsBtn">🍎 Manage my foods</button>
@@ -2819,27 +2821,31 @@ document.getElementById('sportsModeSwitch').addEventListener('click', e => {
   if(!btn || btn.dataset.smode === sportsViewMode) return;
   sportsViewMode = btn.dataset.smode;
   document.querySelectorAll('#sportsModeSwitch .mode-btn').forEach(b => b.classList.toggle('active', b === btn));
-  if(sportsViewMode === 'day') sportsDayIndex = new Date().getDay();
+  if(sportsViewMode === 'day'){ sportsDayIndex = new Date().getDay(); loadDiet(); }
   renderSportsRangeLabel();
   renderSportsPlan();
 });
 
+// Diet is keyed to whatever day is currently selected (getDietDate() reads
+// sportsDayIndex + sportsWeekOffset), so every nav path that can shift that
+// underlying date — including week-level nav in Weekly view — has to
+// reload Diet too, not just re-render the Sports checklist.
 document.getElementById('sportsPrevBtn').addEventListener('click', () => {
   if(sportsViewMode === 'day'){
     sportsDayIndex--;
-    if(sportsDayIndex < 0){ sportsDayIndex = 6; sportsWeekOffset--; loadSportsPlan(); return; }
-    renderSportsRangeLabel(); renderSportsPlan();
+    if(sportsDayIndex < 0){ sportsDayIndex = 6; sportsWeekOffset--; loadSportsPlan(); loadDiet(); return; }
+    renderSportsRangeLabel(); renderSportsPlan(); loadDiet();
   } else {
-    sportsWeekOffset--; loadSportsPlan();
+    sportsWeekOffset--; loadSportsPlan(); loadDiet();
   }
 });
 document.getElementById('sportsNextBtn').addEventListener('click', () => {
   if(sportsViewMode === 'day'){
     sportsDayIndex++;
-    if(sportsDayIndex > 6){ sportsDayIndex = 0; sportsWeekOffset++; loadSportsPlan(); return; }
-    renderSportsRangeLabel(); renderSportsPlan();
+    if(sportsDayIndex > 6){ sportsDayIndex = 0; sportsWeekOffset++; loadSportsPlan(); loadDiet(); return; }
+    renderSportsRangeLabel(); renderSportsPlan(); loadDiet();
   } else {
-    sportsWeekOffset++; loadSportsPlan();
+    sportsWeekOffset++; loadSportsPlan(); loadDiet();
   }
 });
 
@@ -3028,11 +3034,19 @@ function parseWeekPlanWorkbook(wb){
 }
 
 /* ── Diet ── */
+// Diet follows whichever day is currently selected in the Sports Day view,
+// not always "today" — previously it was hardcoded to todayISO, so
+// navigating to a different day in Sports left Diet stuck showing
+// today's (or whatever day was loaded first) log regardless.
+function getDietDate(){
+  return formatISO(getSportsWeekDates()[sportsDayIndex]);
+}
+
 async function loadDiet(){
   try{
     const [defsRes, logRes, targetRes] = await Promise.all([
       apiGetFoodDefs(currentUser),
-      apiGetFoodLog(currentUser, todayISO),
+      apiGetFoodLog(currentUser, getDietDate()),
       apiGetDietTarget(currentUser)
     ]);
     foodDefs = defsRes.foods || [];
@@ -3065,7 +3079,17 @@ function renderDietTargetRow(){
   document.getElementById('dietTargetProtein').addEventListener('change', save);
 }
 
+function renderDietDateLabel(){
+  const dates = getSportsWeekDates();
+  const d     = dates[sportsDayIndex];
+  const iso   = formatISO(d);
+  const label = `${DAY_NAMES_FULL[sportsDayIndex]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+  document.getElementById('dietDateLabel').textContent =
+    `🍽 Diet — ${label}${iso === todayISO ? ' (Today)' : ''}`;
+}
+
 function renderDiet(){
+  renderDietDateLabel();
   renderDietTargetRow();
 
   const totals = foodLogEntries.reduce((t,e) => {
@@ -3138,12 +3162,12 @@ async function addFoodEntry(meal, food, qty){
     meal
   });
   renderDiet();
-  try{ await apiSaveFoodLog(currentUser, todayISO, foodLogEntries); }catch(e){}
+  try{ await apiSaveFoodLog(currentUser, getDietDate(), foodLogEntries); }catch(e){}
 }
 async function removeFoodEntry(id){
   foodLogEntries = foodLogEntries.filter(e => e.id !== id);
   renderDiet();
-  try{ await apiSaveFoodLog(currentUser, todayISO, foodLogEntries); }catch(e){}
+  try{ await apiSaveFoodLog(currentUser, getDietDate(), foodLogEntries); }catch(e){}
 }
 
 /* ── Food definitions manager ── */
