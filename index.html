@@ -982,10 +982,10 @@ const pendingDiffs = {}; // "who:iso" -> { activityId: checked } accumulated sin
 /* ═══════════════════════════════════════════════
    API LAYER
    ═══════════════════════════════════════════════ */
-function fetchWithTimeout(url, ms = 12000){
+function fetchWithTimeout(url, ms = 12000, opts = {}){
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(tid));
+  return fetch(url, { signal: ctrl.signal, ...opts }).finally(() => clearTimeout(tid));
 }
 
 function configured(){
@@ -2503,8 +2503,13 @@ async function apiGetSportsPlan(user, weekStart){
   return json;
 }
 async function apiSaveSportsPlan(user, weekStart, plan){
-  const url = `${API_URL}?action=saveSportsPlan&user=${encodeURIComponent(user)}&weekStart=${weekStart}&plan=${encodeURIComponent(JSON.stringify(plan))}&token=${sessionToken}`;
-  const res = await fetchWithTimeout(url, 15000);
+  // POST with the JSON payload in the body, not the URL — a long GET query
+  // string carrying a whole week's plan can silently fail/truncate on some
+  // networks (the same class of bug we found and fixed for photo uploads).
+  const url  = `${API_URL}?action=saveSportsPlan&user=${encodeURIComponent(user)}&weekStart=${weekStart}&token=${sessionToken}`;
+  const body = new FormData();
+  body.append('plan', JSON.stringify(plan));
+  const res = await fetchWithTimeout(url, 15000, { method:'POST', body });
   if(!res.ok) throw new Error('Network error ' + res.status);
   const json = await res.json();
   if(!json.ok) throw new Error(json.error || 'Failed to save plan');
@@ -2527,8 +2532,10 @@ async function apiGetFoodDefs(user){
   return json;
 }
 async function apiSaveFoodDefs(user, foods){
-  const url = `${API_URL}?action=saveFoodDefs&user=${encodeURIComponent(user)}&foods=${encodeURIComponent(JSON.stringify(foods))}&token=${sessionToken}`;
-  const res = await fetchWithTimeout(url, 15000);
+  const url  = `${API_URL}?action=saveFoodDefs&user=${encodeURIComponent(user)}&token=${sessionToken}`;
+  const body = new FormData();
+  body.append('foods', JSON.stringify(foods));
+  const res = await fetchWithTimeout(url, 15000, { method:'POST', body });
   if(!res.ok) throw new Error('Network error ' + res.status);
   const json = await res.json();
   if(!json.ok) throw new Error(json.error || 'Failed to save foods');
@@ -2543,8 +2550,10 @@ async function apiGetFoodLog(user, date){
   return json;
 }
 async function apiSaveFoodLog(user, date, entries){
-  const url = `${API_URL}?action=saveFoodLog&user=${encodeURIComponent(user)}&date=${date}&entries=${encodeURIComponent(JSON.stringify(entries))}&token=${sessionToken}`;
-  const res = await fetchWithTimeout(url, 15000);
+  const url  = `${API_URL}?action=saveFoodLog&user=${encodeURIComponent(user)}&date=${date}&token=${sessionToken}`;
+  const body = new FormData();
+  body.append('entries', JSON.stringify(entries));
+  const res = await fetchWithTimeout(url, 15000, { method:'POST', body });
   if(!res.ok) throw new Error('Network error ' + res.status);
   const json = await res.json();
   if(!json.ok) throw new Error(json.error || 'Failed to save food log');
@@ -2607,6 +2616,7 @@ function renderSportsDayCard(day, i, dates){
         <div class="sports-session-label${checked?' checked':''}">${s.icon?s.icon+' ':''}${escapeHtml(s.label||'')}</div>
         ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
       </div>
+      <button class="food-entry-remove" data-di="${i}" data-sid="${s.id}" title="Delete">✕</button>
     </div>`;
   }).join('') || '<div class="sports-session-detail" style="padding:6px 0;">Nothing logged yet.</div>';
   return `<div class="sports-day-card">
@@ -2648,7 +2658,24 @@ function renderSportsPlan(){
   host.querySelectorAll('.sports-session-check').forEach(btn =>
     btn.addEventListener('click', () => toggleSportsSessionUI(btn.dataset.sid))
   );
+  host.querySelectorAll('.sports-session-row .food-entry-remove').forEach(btn =>
+    btn.addEventListener('click', () => removeSportsSession(Number(btn.dataset.di), btn.dataset.sid))
+  );
   if(showQuickAdd) wireSportsQuickAdd();
+}
+
+async function removeSportsSession(dayIndex, sid){
+  if(!sportsPlan || !sportsPlan[dayIndex]) return;
+  sportsPlan[dayIndex].sessions = (sportsPlan[dayIndex].sessions || []).filter(s => s.id !== sid);
+  delete sportsDone[sid];
+  renderSportsPlan();
+  const weekStart = formatISO(getSportsWeekDates()[0]);
+  try{
+    await Promise.all([
+      apiSaveSportsPlan(currentUser, weekStart, sportsPlan),
+      apiToggleSportsSession(currentUser, weekStart, sid, false)
+    ]);
+  }catch(e){ setSyncBadge('err', 'Could not delete — try again'); }
 }
 
 function wireSportsQuickAdd(){
