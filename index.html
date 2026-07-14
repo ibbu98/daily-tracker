@@ -2483,6 +2483,24 @@ let foodDefs = [];       // [{id,name,kcal,protein,unit}]
 let foodLogEntries = []; // [{id,foodId,name,qty,kcal,protein,meal}]
 let sportsInitialized = false;
 
+// Seeded once into a fresh account with no foods yet. Values are standard
+// per-serving estimates (USDA-ish) — the biggest variable is the protein
+// powder brand in the shake, so that one's worth double-checking against
+// the actual label; everything here stays editable in "Manage my foods".
+const DEFAULT_FOODS = [
+  { name:'Tortilla',              kcal:140, protein:4,    unit:'1 tortilla' },
+  { name:'Chicken Thighs',        kcal:210, protein:26,   unit:'100g cooked' },
+  { name:'Chicken Breast',        kcal:165, protein:31,   unit:'100g cooked' },
+  { name:'Cooked Dal',            kcal:116, protein:9,    unit:'100g' },
+  { name:'Curd',                  kcal:60,  protein:3.5,  unit:'100g' },
+  { name:'Full Egg',              kcal:78,  protein:6,    unit:'1 egg' },
+  { name:'Egg White',             kcal:17,  protein:4,    unit:'1 egg white' },
+  { name:'Rice',                  kcal:130, protein:2.7,  unit:'100g cooked' },
+  { name:'Omelette',              kcal:180, protein:12,   unit:'2-egg omelette' },
+  { name:'Banana',                kcal:105, protein:1.3,  unit:'1 medium' },
+  { name:'Oats Protein Shake',    kcal:700, protein:42,   unit:'1 serving (60g oats + 300ml milk + 8 almonds + 1 fig + 1 date + raisins + 1 scoop protein)' },
+];
+
 function genId(prefix){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
 
 function sportsStartOfWeek(d){
@@ -2982,6 +3000,10 @@ async function loadDiet(){
     foodLogEntries = logRes.entries || [];
   }catch(e){
     foodDefs = []; foodLogEntries = [];
+  }
+  if(!foodDefs.length){
+    foodDefs = DEFAULT_FOODS.map(f => ({ ...f, id: genId('f') }));
+    try{ await apiSaveFoodDefs(currentUser, foodDefs); }catch(e){}
   }
   renderDiet();
 }
