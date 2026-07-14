@@ -549,10 +549,13 @@
   .sports-add-session-btn{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;}
 
   /* ── Diet ── */
-  .diet-total-bar{display:flex;gap:16px;justify-content:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px;}
-  .diet-total-item{text-align:center;}
-  .diet-total-item .val{font-size:20px;font-weight:700;color:var(--teal);}
-  .diet-total-item .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;}
+  .diet-target-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+  .diet-target-row input{width:70px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--ink);font-size:12px;text-align:center;}
+  .diet-total-bar{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px;}
+  .diet-total-item{text-align:center;min-width:64px;}
+  .diet-total-item .val{font-size:19px;font-weight:700;color:var(--teal);}
+  .diet-total-item .val .target{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .diet-total-item .lbl{font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;}
   .meal-slot{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;}
   .meal-slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
   .meal-slot-title{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);font-family:'IBM Plex Mono',monospace;}
@@ -573,11 +576,12 @@
   .sports-add-row input.time-sub{flex:0.45;min-width:56px;}
   .sports-add-row button{padding:7px 14px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
   .manage-foods-btn{display:block;margin:0 auto 16px;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;}
-  .food-def-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .food-def-row{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line);}
   .food-def-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
-  .food-def-row input.fd-name{flex:2;min-width:0;}
+  .food-def-row input.fd-name{flex:1 1 100%;min-width:0;}
   .food-def-row input.fd-num{width:64px;}
-  .food-def-row input.fd-unit{width:80px;}
+  .food-def-row input.fd-unit{flex:1;min-width:120px;}
+  .food-def-row .fd-num-label{font-size:10px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;margin-right:-4px;}
   .food-def-row button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;padding:2px 6px;}
 
   @media (max-width:640px){
@@ -697,6 +701,7 @@
       </div>
       <div id="sportsPlanHost"></div>
 
+      <div class="diet-target-row" id="dietTargetRow"></div>
       <div class="diet-total-bar" id="dietTotalBar"></div>
       <button class="manage-foods-btn" id="manageFoodsBtn">🍎 Manage my foods</button>
       <div id="dietHost"></div>
@@ -759,10 +764,7 @@
 <div class="modal-overlay hidden" id="foodDefModalOverlay">
   <div class="edit-modal">
     <h3>My Foods</h3>
-    <p style="color:var(--ink-soft);font-size:12.5px;margin:4px 0 14px;">Set the calories and protein per serving once — then just pick from the list when logging a meal.</p>
-    <div class="edit-col-headers">
-      <span style="grid-column:span 2">Food name</span><span>Kcal</span><span>Protein</span><span></span>
-    </div>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:4px 0 14px;">Set the calories, protein, fat, fiber and carbs per serving once — then just pick from the list when logging a meal.</p>
     <div id="foodDefRows"></div>
     <button class="edit-add-btn" id="foodDefAddBtn">+ Add food</button>
     <div class="edit-actions">
@@ -2464,7 +2466,7 @@ if(IS_TESTER) document.getElementById('testerBanner').style.display = 'flex';
    SPORTS & DIET
    ═══════════════════════════════════════════════ */
 const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MEAL_SLOTS = ['Breakfast','Lunch','Dinner','Snack'];
+const MEAL_SLOTS = ['Breakfast','Snack','Lunch','Dinner'];
 const SPORT_TYPES = [
   { key:'Cycling',  icon:'🚴' },
   { key:'Running',  icon:'🏃' },
@@ -2480,8 +2482,9 @@ let sportsViewMode = 'day'; // 'day' | 'weekly'
 let sportsDayIndex = new Date().getDay(); // 0=Sun..6=Sat — which day Day-mode is showing
 let sportsPlan = null;   // array of 7 { day, intensity, sessions:[{id,label,detail,icon}], notes } or null
 let sportsDone = {};     // { sessionId: true }
-let foodDefs = [];       // [{id,name,kcal,protein,unit}]
-let foodLogEntries = []; // [{id,foodId,name,qty,kcal,protein,meal}]
+let foodDefs = [];       // [{id,name,kcal,protein,fat,fiber,carbs,unit}]
+let foodLogEntries = []; // [{id,foodId,name,qty,kcal,protein,fat,fiber,carbs,meal}]
+let dietTarget = { kcal:0, protein:0 };
 let sportsInitialized = false;
 
 // Seeded once into a fresh account with no foods yet. Values are standard
@@ -2489,17 +2492,18 @@ let sportsInitialized = false;
 // powder brand in the shake, so that one's worth double-checking against
 // the actual label; everything here stays editable in "Manage my foods".
 const DEFAULT_FOODS = [
-  { name:'Tortilla',              kcal:140, protein:4,    unit:'1 tortilla' },
-  { name:'Chicken Thighs',        kcal:210, protein:26,   unit:'100g cooked' },
-  { name:'Chicken Breast',        kcal:165, protein:31,   unit:'100g cooked' },
-  { name:'Cooked Dal',            kcal:116, protein:9,    unit:'100g' },
-  { name:'Curd',                  kcal:60,  protein:3.5,  unit:'100g' },
-  { name:'Full Egg',              kcal:78,  protein:6,    unit:'1 egg' },
-  { name:'Egg White',             kcal:17,  protein:4,    unit:'1 egg white' },
-  { name:'Rice',                  kcal:130, protein:2.7,  unit:'100g cooked' },
-  { name:'Omelette',              kcal:180, protein:12,   unit:'2-egg omelette' },
-  { name:'Banana',                kcal:105, protein:1.3,  unit:'1 medium' },
-  { name:'Oats Protein Shake',    kcal:700, protein:42,   unit:'1 serving (60g oats + 300ml milk + 8 almonds + 1 fig + 1 date + raisins + 1 scoop protein)' },
+  { name:'Tortilla',              kcal:140, protein:4,    fat:3.5,  fiber:1.5, carbs:24, unit:'1 tortilla' },
+  { name:'Chicken Thighs',        kcal:210, protein:26,   fat:11,   fiber:0,   carbs:0,  unit:'100g cooked' },
+  { name:'Chicken Breast',        kcal:165, protein:31,   fat:3.6,  fiber:0,   carbs:0,  unit:'100g cooked' },
+  { name:'Cooked Dal',            kcal:116, protein:9,    fat:0.4,  fiber:8,   carbs:20, unit:'100g' },
+  { name:'Curd',                  kcal:60,  protein:3.5,  fat:3.3,  fiber:0,   carbs:4.7,unit:'100g' },
+  { name:'Full Egg',              kcal:78,  protein:6,    fat:5.3,  fiber:0,   carbs:0.6,unit:'1 egg' },
+  { name:'Egg White',             kcal:17,  protein:4,    fat:0.1,  fiber:0,   carbs:0.2,unit:'1 egg white' },
+  { name:'Rice',                  kcal:130, protein:2.7,  fat:0.3,  fiber:0.4, carbs:28, unit:'100g cooked' },
+  { name:'Omelette',              kcal:180, protein:12,   fat:14,   fiber:0,   carbs:1.2,unit:'2-egg omelette' },
+  { name:'Banana',                kcal:105, protein:1.3,  fat:0.4,  fiber:3.1, carbs:27, unit:'1 medium' },
+  { name:'Oats Protein Shake',    kcal:700, protein:42,   fat:20,   fiber:9,   carbs:75, unit:'1 serving (60g oats + 300ml milk + 8 almonds + 1 fig + 1 date + raisins + 1 scoop protein)' },
+  { name:'Quest Protein Chips',   kcal:130, protein:19,   fat:4.5,  fiber:5,   carbs:12, unit:'1 bag' },
 ];
 
 function genId(prefix){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
@@ -2579,6 +2583,22 @@ async function apiSaveFoodLog(user, date, entries){
   if(!res.ok) throw new Error('Network error ' + res.status);
   const json = await res.json();
   if(!json.ok) throw new Error(json.error || 'Failed to save food log');
+  return json;
+}
+async function apiGetDietTarget(user){
+  const url = `${API_URL}?action=getDietTarget&user=${encodeURIComponent(user)}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to load target');
+  return json;
+}
+async function apiSaveDietTarget(user, kcal, protein){
+  const url = `${API_URL}?action=saveDietTarget&user=${encodeURIComponent(user)}&kcal=${kcal}&protein=${protein}&token=${sessionToken}`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error('Network error ' + res.status);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Failed to save target');
   return json;
 }
 
@@ -3002,14 +3022,16 @@ function parseWeekPlanWorkbook(wb){
 /* ── Diet ── */
 async function loadDiet(){
   try{
-    const [defsRes, logRes] = await Promise.all([
+    const [defsRes, logRes, targetRes] = await Promise.all([
       apiGetFoodDefs(currentUser),
-      apiGetFoodLog(currentUser, todayISO)
+      apiGetFoodLog(currentUser, todayISO),
+      apiGetDietTarget(currentUser)
     ]);
     foodDefs = defsRes.foods || [];
     foodLogEntries = logRes.entries || [];
+    dietTarget = { kcal: targetRes.kcal || 0, protein: targetRes.protein || 0 };
   }catch(e){
-    foodDefs = []; foodLogEntries = [];
+    foodDefs = []; foodLogEntries = []; dietTarget = { kcal:0, protein:0 };
   }
   if(!foodDefs.length){
     foodDefs = DEFAULT_FOODS.map(f => ({ ...f, id: genId('f') }));
@@ -3018,12 +3040,40 @@ async function loadDiet(){
   renderDiet();
 }
 
+function renderDietTargetRow(){
+  document.getElementById('dietTargetRow').innerHTML = `
+    🎯 Target:
+    <input type="number" id="dietTargetKcal" placeholder="Kcal" min="0" value="${dietTarget.kcal || ''}"> kcal ·
+    <input type="number" id="dietTargetProtein" placeholder="Protein" min="0" value="${dietTarget.protein || ''}"> g protein
+  `;
+  const save = async () => {
+    const kcal    = parseFloat(document.getElementById('dietTargetKcal').value) || 0;
+    const protein = parseFloat(document.getElementById('dietTargetProtein').value) || 0;
+    dietTarget = { kcal, protein };
+    renderDiet();
+    try{ await apiSaveDietTarget(currentUser, kcal, protein); }catch(e){}
+  };
+  document.getElementById('dietTargetKcal').addEventListener('change', save);
+  document.getElementById('dietTargetProtein').addEventListener('change', save);
+}
+
 function renderDiet(){
-  const totalKcal    = foodLogEntries.reduce((s,e) => s + (e.kcal||0), 0);
-  const totalProtein = foodLogEntries.reduce((s,e) => s + (e.protein||0), 0);
+  renderDietTargetRow();
+
+  const totals = foodLogEntries.reduce((t,e) => {
+    t.kcal += e.kcal||0; t.protein += e.protein||0; t.fat += e.fat||0; t.fiber += e.fiber||0; t.carbs += e.carbs||0;
+    return t;
+  }, { kcal:0, protein:0, fat:0, fiber:0, carbs:0 });
+
+  const kcalTarget    = dietTarget.kcal    ? `<span class="target"> / ${dietTarget.kcal}</span>` : '';
+  const proteinTarget = dietTarget.protein ? `<span class="target"> / ${dietTarget.protein}g</span>` : '';
+
   document.getElementById('dietTotalBar').innerHTML = `
-    <div class="diet-total-item"><div class="val">${Math.round(totalKcal)}</div><div class="lbl">Kcal today</div></div>
-    <div class="diet-total-item"><div class="val">${Math.round(totalProtein)}g</div><div class="lbl">Protein today</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totals.kcal)}${kcalTarget}</div><div class="lbl">Kcal</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totals.protein)}g${proteinTarget}</div><div class="lbl">Protein</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totals.fat)}g</div><div class="lbl">Fat</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totals.fiber)}g</div><div class="lbl">Fiber</div></div>
+    <div class="diet-total-item"><div class="val">${Math.round(totals.carbs)}g</div><div class="lbl">Carbs</div></div>
   `;
 
   const foodOptions = foodDefs.map(f =>
@@ -3036,7 +3086,7 @@ function renderDiet(){
     const rows = entries.map(e => `
       <div class="food-entry-row">
         <span class="food-entry-name">${escapeHtml(e.name)} × ${e.qty}</span>
-        <span class="food-entry-macro">${Math.round(e.kcal)} kcal · ${Math.round(e.protein)}g</span>
+        <span class="food-entry-macro">${Math.round(e.kcal)} kcal · ${Math.round(e.protein)}g P · ${Math.round(e.fat||0)}g F · ${Math.round(e.carbs||0)}g C</span>
         <button class="food-entry-remove" data-eid="${e.id}">✕</button>
       </div>`).join('');
     return `<div class="meal-slot" data-meal="${meal}">
@@ -3046,7 +3096,10 @@ function renderDiet(){
       </div>
       ${rows}
       <div class="food-add-row">
-        <select class="food-select">${foodDefs.length ? foodOptions : '<option value="">Add foods below first</option>'}</select>
+        <select class="food-select">
+          <option value="" selected disabled>${foodDefs.length ? 'Select a food…' : 'Add foods below first'}</option>
+          ${foodOptions}
+        </select>
         <input type="number" class="food-qty" value="1" min="0.25" step="0.25">
         <button type="button" class="food-add-btn"${foodDefs.length?'':' disabled'}>+ Add</button>
       </div>
@@ -3060,7 +3113,8 @@ function renderDiet(){
       const slot   = btn.closest('.meal-slot');
       const sel    = slot.querySelector('.food-select');
       const qtyInp = slot.querySelector('.food-qty');
-      const food   = foodDefs.find(f => f.id === sel.value);
+      if(!sel.value) return; // nothing picked yet
+      const food = foodDefs.find(f => f.id === sel.value);
       if(!food) return;
       const qty = parseFloat(qtyInp.value) || 1;
       addFoodEntry(slot.dataset.meal, food, qty);
@@ -3068,10 +3122,11 @@ function renderDiet(){
 }
 
 async function addFoodEntry(meal, food, qty){
+  const scale = n => Math.round((n||0) * qty * 10) / 10;
   foodLogEntries.push({
     id: genId('e'), foodId: food.id, name: food.name, qty,
-    kcal: Math.round(food.kcal * qty * 10) / 10,
-    protein: Math.round(food.protein * qty * 10) / 10,
+    kcal: scale(food.kcal), protein: scale(food.protein),
+    fat: scale(food.fat), fiber: scale(food.fiber), carbs: scale(food.carbs),
     meal
   });
   renderDiet();
@@ -3088,15 +3143,21 @@ function openFoodDefModal(){
   renderFoodDefRows(foodDefs);
   document.getElementById('foodDefModalOverlay').classList.remove('hidden');
 }
+function foodDefRowInnerHTML(f){
+  f = f || {};
+  return `<input type="text" class="fd-name" placeholder="Food name" value="${escapeHtml(f.name||'')}">
+    <span class="fd-num-label">Kcal</span><input type="number" class="fd-num fd-kcal" value="${f.kcal||''}">
+    <span class="fd-num-label">Prot g</span><input type="number" class="fd-num fd-protein" value="${f.protein||''}">
+    <span class="fd-num-label">Fat g</span><input type="number" class="fd-num fd-fat" value="${f.fat||''}">
+    <span class="fd-num-label">Fiber g</span><input type="number" class="fd-num fd-fiber" value="${f.fiber||''}">
+    <span class="fd-num-label">Carbs g</span><input type="number" class="fd-num fd-carbs" value="${f.carbs||''}">
+    <input type="text" class="fd-unit" placeholder="Unit (e.g. 1 bowl)" value="${escapeHtml(f.unit||'')}">
+    <button type="button" class="fd-del-btn">✕</button>`;
+}
 function renderFoodDefRows(foods){
-  document.getElementById('foodDefRows').innerHTML = foods.map(f => `
-    <div class="food-def-row" data-fid="${f.id || genId('f')}">
-      <input type="text" class="fd-name" placeholder="Food name" value="${escapeHtml(f.name||'')}">
-      <input type="number" class="fd-num fd-kcal" placeholder="Kcal" value="${f.kcal||''}">
-      <input type="number" class="fd-num fd-protein" placeholder="Protein" value="${f.protein||''}">
-      <input type="text" class="fd-unit" placeholder="Unit (e.g. 1 bowl)" value="${escapeHtml(f.unit||'')}">
-      <button type="button" class="fd-del-btn">✕</button>
-    </div>`).join('');
+  document.getElementById('foodDefRows').innerHTML = foods.map(f =>
+    `<div class="food-def-row" data-fid="${f.id || genId('f')}">${foodDefRowInnerHTML(f)}</div>`
+  ).join('');
 }
 document.getElementById('foodDefRows').addEventListener('click', e => {
   const del = e.target.closest('.fd-del-btn');
@@ -3107,7 +3168,7 @@ document.getElementById('foodDefAddBtn').addEventListener('click', () => {
   const div = document.createElement('div');
   div.className = 'food-def-row';
   div.dataset.fid = genId('f');
-  div.innerHTML = `<input type="text" class="fd-name" placeholder="Food name"><input type="number" class="fd-num fd-kcal" placeholder="Kcal"><input type="number" class="fd-num fd-protein" placeholder="Protein"><input type="text" class="fd-unit" placeholder="Unit (e.g. 1 bowl)"><button type="button" class="fd-del-btn">✕</button>`;
+  div.innerHTML = foodDefRowInnerHTML({});
   container.appendChild(div);
 });
 document.getElementById('foodDefSaveBtn').addEventListener('click', async () => {
@@ -3116,6 +3177,9 @@ document.getElementById('foodDefSaveBtn').addEventListener('click', async () => 
     name: row.querySelector('.fd-name').value.trim(),
     kcal: parseFloat(row.querySelector('.fd-kcal').value) || 0,
     protein: parseFloat(row.querySelector('.fd-protein').value) || 0,
+    fat: parseFloat(row.querySelector('.fd-fat').value) || 0,
+    fiber: parseFloat(row.querySelector('.fd-fiber').value) || 0,
+    carbs: parseFloat(row.querySelector('.fd-carbs').value) || 0,
     unit: row.querySelector('.fd-unit').value.trim(),
   })).filter(f => f.name);
   foodDefs = foods;
