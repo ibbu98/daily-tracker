@@ -2639,14 +2639,27 @@ function renderSportsRangeLabel(){
   }
 }
 
+const sportsPlanCache = {}; // weekStart -> { plan, done, time }
+const SPORTS_PLAN_CACHE_TTL = 60000;
+function touchSportsPlanCache(){
+  sportsPlanCache[formatISO(getSportsWeekDates()[0])] = { plan: sportsPlan, done: sportsDone, time: Date.now() };
+}
+
 async function loadSportsPlan(){
   const weekStart = formatISO(getSportsWeekDates()[0]);
   renderSportsRangeLabel();
+  const hit = sportsPlanCache[weekStart];
+  if(hit && Date.now() - hit.time < SPORTS_PLAN_CACHE_TTL){
+    sportsPlan = hit.plan; sportsDone = hit.done;
+    renderSportsPlan();
+    return;
+  }
   document.getElementById('sportsPlanHost').innerHTML = '<div class="sports-empty">Loading…</div>';
   try{
     const res = await apiGetSportsPlan(currentUser, weekStart);
     sportsPlan = res.plan;
     sportsDone = res.done || {};
+    sportsPlanCache[weekStart] = { plan: sportsPlan, done: sportsDone, time: Date.now() };
   }catch(e){
     sportsPlan = null; sportsDone = {};
   }
@@ -2745,6 +2758,7 @@ async function removeSportsSession(dayIndex, sid){
   sportsPlan[dayIndex].sessions = (sportsPlan[dayIndex].sessions || []).filter(s => s.id !== sid);
   delete sportsDone[sid];
   renderSportsPlan();
+  touchSportsPlanCache();
   const weekStart = formatISO(getSportsWeekDates()[0]);
   try{
     await Promise.all([
@@ -2796,6 +2810,7 @@ async function quickAddSportsSession(type, distanceKm, min, sec){
   sportsPlan[sportsDayIndex].sessions.push(session);
   sportsDone[session.id] = true;
   renderSportsPlan();
+  touchSportsPlanCache();
 
   const weekStart = formatISO(getSportsWeekDates()[0]);
   try{
@@ -2812,6 +2827,7 @@ async function toggleSportsSessionUI(sid){
   const checked = !sportsDone[sid];
   if(checked) sportsDone[sid] = true; else delete sportsDone[sid];
   renderSportsPlan();
+  touchSportsPlanCache();
   const weekStart = formatISO(getSportsWeekDates()[0]);
   try{ await apiToggleSportsSession(currentUser, weekStart, sid, checked); }catch(e){}
 }
@@ -2821,7 +2837,7 @@ document.getElementById('sportsModeSwitch').addEventListener('click', e => {
   if(!btn || btn.dataset.smode === sportsViewMode) return;
   sportsViewMode = btn.dataset.smode;
   document.querySelectorAll('#sportsModeSwitch .mode-btn').forEach(b => b.classList.toggle('active', b === btn));
-  if(sportsViewMode === 'day'){ sportsDayIndex = new Date().getDay(); loadDiet(); }
+  if(sportsViewMode === 'day'){ sportsDayIndex = new Date().getDay(); loadFoodLog(); }
   renderSportsRangeLabel();
   renderSportsPlan();
 });
@@ -2829,23 +2845,24 @@ document.getElementById('sportsModeSwitch').addEventListener('click', e => {
 // Diet is keyed to whatever day is currently selected (getDietDate() reads
 // sportsDayIndex + sportsWeekOffset), so every nav path that can shift that
 // underlying date — including week-level nav in Weekly view — has to
-// reload Diet too, not just re-render the Sports checklist.
+// reload the food log too, not just re-render the Sports checklist. Only
+// the log itself (loadFoodLog) — foodDefs/target don't change per-day.
 document.getElementById('sportsPrevBtn').addEventListener('click', () => {
   if(sportsViewMode === 'day'){
     sportsDayIndex--;
-    if(sportsDayIndex < 0){ sportsDayIndex = 6; sportsWeekOffset--; loadSportsPlan(); loadDiet(); return; }
-    renderSportsRangeLabel(); renderSportsPlan(); loadDiet();
+    if(sportsDayIndex < 0){ sportsDayIndex = 6; sportsWeekOffset--; loadSportsPlan(); loadFoodLog(); return; }
+    renderSportsRangeLabel(); renderSportsPlan(); loadFoodLog();
   } else {
-    sportsWeekOffset--; loadSportsPlan(); loadDiet();
+    sportsWeekOffset--; loadSportsPlan(); loadFoodLog();
   }
 });
 document.getElementById('sportsNextBtn').addEventListener('click', () => {
   if(sportsViewMode === 'day'){
     sportsDayIndex++;
-    if(sportsDayIndex > 6){ sportsDayIndex = 0; sportsWeekOffset++; loadSportsPlan(); loadDiet(); return; }
-    renderSportsRangeLabel(); renderSportsPlan(); loadDiet();
+    if(sportsDayIndex > 6){ sportsDayIndex = 0; sportsWeekOffset++; loadSportsPlan(); loadFoodLog(); return; }
+    renderSportsRangeLabel(); renderSportsPlan(); loadFoodLog();
   } else {
-    sportsWeekOffset++; loadSportsPlan(); loadDiet();
+    sportsWeekOffset++; loadSportsPlan(); loadFoodLog();
   }
 });
 
@@ -2934,6 +2951,7 @@ document.getElementById('sportsEditSaveBtn').addEventListener('click', async () 
   const plan = readSportsEditDays();
   sportsPlan = plan;
   renderSportsPlan();
+  touchSportsPlanCache();
   document.getElementById('sportsEditModalOverlay').classList.add('hidden');
   try{
     await apiSaveSportsPlan(currentUser, formatISO(getSportsWeekDates()[0]), plan);
@@ -2956,6 +2974,7 @@ document.getElementById('sportsUploadInput').addEventListener('change', async e 
     if(!parsed){ alert('Could not find a "Day / Intensity / AM Session / PM Session" table in that file.'); return; }
     sportsPlan = parsed;
     renderSportsPlan();
+    touchSportsPlanCache();
     await apiSaveSportsPlan(currentUser, formatISO(getSportsWeekDates()[0]), parsed);
     setSyncBadge('cloud', 'Plan uploaded ✓');
     setTimeout(() => setSyncBadge('cloud', `Synced — ${USER_A_NAME} &amp; ${USER_B_NAME}`), 2000);
@@ -3042,24 +3061,52 @@ function getDietDate(){
   return formatISO(getSportsWeekDates()[sportsDayIndex]);
 }
 
-async function loadDiet(){
+// foodDefs/dietTarget are per-user, not per-day — fetching them fresh on
+// every day/week nav click (as loadDiet() used to) was 2 wasted network
+// round trips per click on top of the one that actually mattered. They're
+// now loaded once when the Sports & Diet tab opens; only the food log
+// (loadFoodLog) re-fetches when the selected day changes.
+const foodLogCache = {}; // dateISO -> { entries, time }
+const FOOD_LOG_CACHE_TTL = 60000;
+
+async function loadDietStatic(){
   try{
-    const [defsRes, logRes, targetRes] = await Promise.all([
+    const [defsRes, targetRes] = await Promise.all([
       apiGetFoodDefs(currentUser),
-      apiGetFoodLog(currentUser, getDietDate()),
       apiGetDietTarget(currentUser)
     ]);
     foodDefs = defsRes.foods || [];
-    foodLogEntries = logRes.entries || [];
     dietTarget = { kcal: targetRes.kcal || 0, protein: targetRes.protein || 0 };
   }catch(e){
-    foodDefs = []; foodLogEntries = []; dietTarget = { kcal:0, protein:0 };
+    foodDefs = []; dietTarget = { kcal:0, protein:0 };
   }
   if(!foodDefs.length){
     foodDefs = DEFAULT_FOODS.map(f => ({ ...f, id: genId('f') }));
     try{ await apiSaveFoodDefs(currentUser, foodDefs); }catch(e){}
   }
+}
+
+async function loadFoodLog(){
+  const date = getDietDate();
+  const hit  = foodLogCache[date];
+  if(hit && Date.now() - hit.time < FOOD_LOG_CACHE_TTL){
+    foodLogEntries = hit.entries;
+    renderDiet();
+    return;
+  }
+  try{
+    const logRes = await apiGetFoodLog(currentUser, date);
+    foodLogEntries = logRes.entries || [];
+    foodLogCache[date] = { entries: foodLogEntries, time: Date.now() };
+  }catch(e){
+    foodLogEntries = [];
+  }
   renderDiet();
+}
+
+async function loadDiet(){
+  await loadDietStatic();
+  await loadFoodLog();
 }
 
 function renderDietTargetRow(){
@@ -3153,6 +3200,10 @@ function renderDiet(){
     }));
 }
 
+function touchFoodLogCache(){
+  foodLogCache[getDietDate()] = { entries: foodLogEntries, time: Date.now() };
+}
+
 async function addFoodEntry(meal, food, qty){
   const scale = n => Math.round((n||0) * qty * 10) / 10;
   foodLogEntries.push({
@@ -3162,11 +3213,13 @@ async function addFoodEntry(meal, food, qty){
     meal
   });
   renderDiet();
+  touchFoodLogCache();
   try{ await apiSaveFoodLog(currentUser, getDietDate(), foodLogEntries); }catch(e){}
 }
 async function removeFoodEntry(id){
   foodLogEntries = foodLogEntries.filter(e => e.id !== id);
   renderDiet();
+  touchFoodLogCache();
   try{ await apiSaveFoodLog(currentUser, getDietDate(), foodLogEntries); }catch(e){}
 }
 
