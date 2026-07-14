@@ -522,14 +522,17 @@
   .sports-day-name{font-weight:700;font-size:14px;}
   .sports-day-name.today{color:var(--teal);}
   .sports-day-intensity{font-size:10.5px;padding:2px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
-  .sports-session-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
+  .sports-session-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);}
   .sports-session-row:first-of-type{border-top:none;}
-  .sports-session-check{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;color:var(--check-mark);font-size:13px;}
+  .sports-session-check{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;color:var(--check-mark);font-size:13px;}
   .sports-session-check.checked{background:var(--teal);border-color:var(--teal);}
   .sports-session-text{flex:1;min-width:0;}
-  .sports-session-label{font-size:13.5px;font-weight:600;}
+  .sports-session-label{font-size:14px;font-weight:700;letter-spacing:.01em;}
   .sports-session-label.checked{text-decoration:line-through;color:var(--ink-soft);}
-  .sports-session-detail{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+  .sports-session-detail{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .sports-session-stats{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;}
+  .sports-session-stat{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);padding:3px 9px;border-radius:999px;letter-spacing:.02em;white-space:nowrap;}
+  .sports-session-stat.pace{color:var(--teal);border-color:rgba(82,191,152,0.35);}
   .sports-empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:24px 0;}
 
   /* ── Sports plan editor modal ── */
@@ -2605,6 +2608,17 @@ async function loadSportsPlan(){
   renderSportsPlan();
 }
 
+// Structured sessions (distance/time/pace) render as evenly-spaced chips;
+// sessions that only have a free-text detail (e.g. some Excel imports)
+// fall back to a plain line so nothing is lost.
+function renderSportsSessionStats(s){
+  const chips = [];
+  if(s.distance) chips.push(`<span class="sports-session-stat">${escapeHtml(s.distance)}</span>`);
+  if(s.time)     chips.push(`<span class="sports-session-stat">${escapeHtml(s.time)}</span>`);
+  if(s.pace)      chips.push(`<span class="sports-session-stat pace">${escapeHtml(s.pace)}</span>`);
+  if(chips.length) return `<div class="sports-session-stats">${chips.join('')}</div>`;
+  return s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : '';
+}
 function renderSportsDayCard(day, i, dates){
   const iso = formatISO(dates[i] || dates[0]);
   const isToday = iso === todayISO;
@@ -2614,7 +2628,7 @@ function renderSportsDayCard(day, i, dates){
       <button class="sports-session-check${checked?' checked':''}" data-sid="${s.id}">${checked?'✓':''}</button>
       <div class="sports-session-text">
         <div class="sports-session-label${checked?' checked':''}">${s.icon?s.icon+' ':''}${escapeHtml(s.label||'')}</div>
-        ${s.detail ? `<div class="sports-session-detail">${escapeHtml(s.detail)}</div>` : ''}
+        ${renderSportsSessionStats(s)}
       </div>
       <button class="food-entry-remove" data-di="${i}" data-sid="${s.id}" title="Delete">✕</button>
     </div>`;
@@ -2632,10 +2646,18 @@ function sportsQuickAddRowHTML(){
   const typeOpts = SPORT_TYPES.filter(t => t.key !== 'Other').map(t => `<option value="${t.key}">${t.icon} ${t.key}</option>`).join('');
   return `<div class="sports-add-row">
     <select id="sportsQuickType">${typeOpts}</select>
-    <input type="text" id="sportsQuickDistance" placeholder="Distance (e.g. 6K)">
-    <input type="text" id="sportsQuickTime" placeholder="Time (e.g. 42 min)">
+    <input type="number" id="sportsQuickDistance" placeholder="Distance (km)" min="0" step="0.01" inputmode="decimal">
+    <input type="number" id="sportsQuickTime" placeholder="Time (min)" min="0" step="0.5" inputmode="decimal">
     <button type="button" id="sportsQuickAddBtn">+ Log it</button>
   </div>`;
+}
+// min/km pace as "M:SS /km" — blank if either side is missing/zero.
+function formatPace(distanceKm, timeMin){
+  if(!distanceKm || !timeMin) return '';
+  const paceMin = timeMin / distanceKm;
+  const min = Math.floor(paceMin);
+  const sec = Math.round((paceMin - min) * 60);
+  return `${min}:${String(sec).padStart(2,'0')} /km`;
 }
 
 function renderSportsPlan(){
@@ -2682,10 +2704,10 @@ function wireSportsQuickAdd(){
   const btn = document.getElementById('sportsQuickAddBtn');
   if(!btn) return;
   btn.addEventListener('click', () => {
-    const type     = document.getElementById('sportsQuickType').value;
-    const distance = document.getElementById('sportsQuickDistance').value.trim();
-    const time     = document.getElementById('sportsQuickTime').value.trim();
-    quickAddSportsSession(type, distance, time);
+    const type       = document.getElementById('sportsQuickType').value;
+    const distanceKm = parseFloat(document.getElementById('sportsQuickDistance').value) || 0;
+    const timeMin    = parseFloat(document.getElementById('sportsQuickTime').value) || 0;
+    quickAddSportsSession(type, distanceKm, timeMin);
   });
 }
 
@@ -2693,15 +2715,23 @@ function wireSportsQuickAdd(){
 // recording what you actually did, as opposed to the plan editor which is
 // for setting up sessions ahead of time. Added sessions are marked done
 // immediately since you're logging something you already finished.
-async function quickAddSportsSession(type, distance, time){
+async function quickAddSportsSession(type, distanceKm, timeMin){
   if(!sportsPlan || !sportsPlan.length){
     sportsPlan = DAY_NAMES_FULL.map(name => ({ day: name, intensity:'', sessions:[] }));
   }
+  const pace  = formatPace(distanceKm, timeMin);
+  const stats = [
+    distanceKm ? `${distanceKm} km` : '',
+    timeMin ? `${timeMin} min` : '',
+    pace
+  ].filter(Boolean).join(' · ');
   const session = {
-    id: genId('s'), type,
-    label: '', distance, time,
+    id: genId('s'), type, label: type,
+    distance: distanceKm ? `${distanceKm} km` : '',
+    time: timeMin ? `${timeMin} min` : '',
+    pace,
     icon: sportTypeIcon(type),
-    detail: [distance, time].filter(Boolean).join(' · ')
+    detail: stats
   };
   if(!sportsPlan[sportsDayIndex]) sportsPlan[sportsDayIndex] = { day: DAY_NAMES_FULL[sportsDayIndex], intensity:'', sessions:[] };
   if(!sportsPlan[sportsDayIndex].sessions) sportsPlan[sportsDayIndex].sessions = [];
