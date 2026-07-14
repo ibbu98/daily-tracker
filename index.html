@@ -549,32 +549,33 @@
   .sports-add-session-btn{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;}
 
   /* ── Diet ── */
-  .diet-target-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
-  .diet-target-row input{width:70px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--ink);font-size:12px;text-align:center;}
-  .diet-total-bar{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px;}
-  .diet-total-item{text-align:center;min-width:64px;}
+  .diet-target-row{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-bottom:1px dashed var(--line);border-radius:14px 14px 0 0;padding:10px 14px;margin-bottom:0;font-size:11.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+  .diet-target-row input{width:64px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--ink);font-size:12px;text-align:center;}
+  .diet-total-bar{display:flex;gap:0;justify-content:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-top:none;border-radius:0 0 14px 14px;padding:14px 6px;margin-bottom:18px;}
+  .diet-total-item{text-align:center;flex:1;min-width:64px;padding:0 8px;border-left:1px solid var(--line);}
+  .diet-total-item:first-child{border-left:none;}
   .diet-total-item .val{font-size:19px;font-weight:700;color:var(--teal);}
   .diet-total-item .val .target{font-size:12px;font-weight:600;color:var(--ink-soft);}
-  .diet-total-item .lbl{font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;}
-  .meal-slot{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;}
+  .diet-total-item .lbl{font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+  .meal-slot{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;}
   .meal-slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
   .meal-slot-title{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);font-family:'IBM Plex Mono',monospace;}
   .meal-slot-kcal{font-size:11.5px;color:var(--ink-soft);}
-  .food-entry-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);}
+  .food-entry-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
   .food-entry-row:first-of-type{border-top:none;}
   .food-entry-name{font-size:13px;flex:1;min-width:0;}
-  .food-entry-macro{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
-  .food-entry-remove{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;padding:2px 6px;}
-  .food-add-row{display:flex;gap:6px;margin-top:8px;}
-  .food-add-row select{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
-  .food-add-row input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
-  .food-add-row button{padding:7px 12px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
+  .food-entry-macro{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;font-family:'IBM Plex Mono',monospace;}
+  .food-entry-remove{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;padding:2px 6px;flex:none;}
+  .food-add-row{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);align-items:center;}
+  .food-add-row select{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink);font-size:12.5px;}
+  .food-add-row input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink);font-size:12.5px;text-align:center;flex:none;}
+  .food-add-row button{padding:8px 14px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;flex:none;}
 
-  .sports-add-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
-  .sports-add-row select{flex:1.2;min-width:110px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
-  .sports-add-row input{flex:0.8;min-width:80px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12.5px;}
-  .sports-add-row input.time-sub{flex:0.45;min-width:56px;}
-  .sports-add-row button{padding:7px 14px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;}
+  .sports-add-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;}
+  .sports-add-row select{flex:1.4;min-width:130px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink);font-size:12.5px;}
+  .sports-add-row input{flex:0.8;min-width:90px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink);font-size:12.5px;text-align:center;}
+  .sports-add-row input.time-sub{flex:0.5;min-width:60px;}
+  .sports-add-row button{padding:8px 16px;border-radius:8px;border:none;background:var(--teal);color:var(--check-mark);font-weight:700;font-size:12.5px;cursor:pointer;flex:none;}
   .manage-foods-btn{display:block;margin:0 auto 16px;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Mono',monospace;}
   .food-def-row{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line);}
   .food-def-row input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12.5px;}
@@ -587,7 +588,10 @@
   @media (max-width:640px){
     .food-add-row{flex-wrap:wrap;}
     .food-add-row select{flex-basis:100%;}
-    .diet-total-bar{gap:10px;}
+    .diet-total-bar{row-gap:14px;}
+    .diet-total-item{flex-basis:30%;border-left:none;}
+    .sports-add-row select{flex-basis:100%;}
+    .sports-add-row input.time-sub{flex:1;}
   }
 </style>
 </head>
@@ -2684,7 +2688,10 @@ function renderSportsDayCard(day, i, dates){
 function sportsQuickAddRowHTML(){
   const typeOpts = SPORT_TYPES.filter(t => t.key !== 'Other').map(t => `<option value="${t.key}">${t.icon} ${t.key}</option>`).join('');
   return `<div class="sports-add-row">
-    <select id="sportsQuickType">${typeOpts}</select>
+    <select id="sportsQuickType">
+      <option value="" selected disabled>Select an activity…</option>
+      ${typeOpts}
+    </select>
     <input type="number" id="sportsQuickDistance" placeholder="Distance (km)" min="0" step="0.01" inputmode="decimal">
     <input type="number" id="sportsQuickTimeMin" class="time-sub" placeholder="Min" min="0" step="1" inputmode="numeric">
     <input type="number" id="sportsQuickTimeSec" class="time-sub" placeholder="Sec" min="0" max="59" step="1" inputmode="numeric">
@@ -2749,7 +2756,8 @@ function wireSportsQuickAdd(){
   const btn = document.getElementById('sportsQuickAddBtn');
   if(!btn) return;
   btn.addEventListener('click', () => {
-    const type       = document.getElementById('sportsQuickType').value;
+    const type = document.getElementById('sportsQuickType').value;
+    if(!type) return; // nothing picked yet
     const distanceKm = parseFloat(document.getElementById('sportsQuickDistance').value) || 0;
     const min        = parseInt(document.getElementById('sportsQuickTimeMin').value) || 0;
     const sec        = parseInt(document.getElementById('sportsQuickTimeSec').value) || 0;
